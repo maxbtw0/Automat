@@ -1,0 +1,66 @@
+{
+  "format": "automat",
+  "version": 2,
+  "document": {
+    "type": "NPDA",
+    "alphabet": ["a", "b"],
+    "stack": {
+      "alphabet": ["A", "B", "#"],
+      "start": "#",
+      "acceptance": "final"
+    },
+    "graph": {
+      "states": [
+        { "id": "s_push", "label": "q0", "x": 140, "y": 240, "isStart": true, "isFinal": false },
+        { "id": "s_pop", "label": "q1", "x": 420, "y": 240, "isStart": false, "isFinal": false },
+        { "id": "s_end", "label": "q2", "x": 660, "y": 240, "isStart": false, "isFinal": true }
+      ],
+      "transitions": [
+        {
+          "id": "t_push",
+          "from": "s_push",
+          "to": "s_push",
+          "labels": [
+            { "read": "a", "pop": "#", "push": ["A", "#"] },
+            { "read": "a", "pop": "A", "push": ["A", "A"] },
+            { "read": "a", "pop": "B", "push": ["A", "B"] },
+            { "read": "b", "pop": "#", "push": ["B", "#"] },
+            { "read": "b", "pop": "A", "push": ["B", "A"] },
+            { "read": "b", "pop": "B", "push": ["B", "B"] }
+          ]
+        },
+        {
+          "id": "t_middle",
+          "from": "s_push",
+          "to": "s_pop",
+          "labels": [
+            { "read": "ε", "pop": "#", "push": ["#"] },
+            { "read": "ε", "pop": "A", "push": ["A"] },
+            { "read": "ε", "pop": "B", "push": ["B"] },
+            { "read": "a", "pop": "#", "push": ["#"] },
+            { "read": "a", "pop": "A", "push": ["A"] },
+            { "read": "a", "pop": "B", "push": ["B"] },
+            { "read": "b", "pop": "#", "push": ["#"] },
+            { "read": "b", "pop": "A", "push": ["A"] },
+            { "read": "b", "pop": "B", "push": ["B"] }
+          ]
+        },
+        {
+          "id": "t_pop",
+          "from": "s_pop",
+          "to": "s_pop",
+          "labels": [
+            { "read": "a", "pop": "A", "push": [] },
+            { "read": "b", "pop": "B", "push": [] }
+          ]
+        },
+        {
+          "id": "t_end",
+          "from": "s_pop",
+          "to": "s_end",
+          "labels": [{ "read": "ε", "pop": "#", "push": ["#"] }]
+        }
+      ]
+    }
+  }
+}

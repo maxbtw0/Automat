@@ -1,0 +1,33 @@
+{
+  "name": "automat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Editor und Simulator für Automaten (DEA, NEA, Kellerautomat, Turingmaschine)",
+  "author": "maxbtw0",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json --composite false && tsc --noEmit -p tsconfig.web.json --composite false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "icons": "electron scripts/icons.mjs",
+    "dist": "npm run build && node scripts/dist.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.0",
+    "zustand": "^5.0.15"
+  }
+}

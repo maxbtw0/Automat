@@ -1,0 +1,104 @@
+{
+  "format": "automat",
+  "version": 2,
+  "document": {
+    "type": "TM",
+    "alphabet": ["a", "b", "c"],
+    "tape": {
+      "alphabet": ["a", "b", "c", "X", "Y", "Z", "#"],
+      "blank": "#"
+    },
+    "graph": {
+      "states": [
+        { "id": "s_mark_a", "label": "q0", "x": 140, "y": 260, "isStart": true, "isFinal": false },
+        { "id": "s_find_b", "label": "q1", "x": 380, "y": 260, "isStart": false, "isFinal": false },
+        { "id": "s_find_c", "label": "q2", "x": 620, "y": 260, "isStart": false, "isFinal": false },
+        { "id": "s_back", "label": "q3", "x": 380, "y": 460, "isStart": false, "isFinal": false },
+        { "id": "s_check", "label": "q4", "x": 140, "y": 80, "isStart": false, "isFinal": false },
+        { "id": "s_accept", "label": "q5", "x": 380, "y": 80, "isStart": false, "isFinal": true }
+      ],
+      "transitions": [
+        {
+          "id": "t_mark_a",
+          "from": "s_mark_a",
+          "to": "s_find_b",
+          "labels": [{ "read": "a", "write": "X", "move": "R" }]
+        },
+        {
+          "id": "t_find_b",
+          "from": "s_find_b",
+          "to": "s_find_b",
+          "labels": [
+            { "read": "a", "write": "a", "move": "R" },
+            { "read": "Y", "write": "Y", "move": "R" }
+          ]
+        },
+        {
+          "id": "t_mark_b",
+          "from": "s_find_b",
+          "to": "s_find_c",
+          "labels": [{ "read": "b", "write": "Y", "move": "R" }]
+        },
+        {
+          "id": "t_find_c",
+          "from": "s_find_c",
+          "to": "s_find_c",
+          "labels": [
+            { "read": "b", "write": "b", "move": "R" },
+            { "read": "Z", "write": "Z", "move": "R" }
+          ]
+        },
+        {
+          "id": "t_mark_c",
+          "from": "s_find_c",
+          "to": "s_back",
+          "labels": [{ "read": "c", "write": "Z", "move": "L" }]
+        },
+        {
+          "id": "t_back",
+          "from": "s_back",
+          "to": "s_back",
+          "labels": [
+            { "read": "a", "write": "a", "move": "L" },
+            { "read": "b", "write": "b", "move": "L" },
+            { "read": "Y", "write": "Y", "move": "L" },
+            { "read": "Z", "write": "Z", "move": "L" }
+          ]
+        },
+        {
+          "id": "t_next",
+          "from": "s_back",
+          "to": "s_mark_a",
+          "labels": [{ "read": "X", "write": "X", "move": "R" }]
+        },
+        {
+          "id": "t_done",
+          "from": "s_mark_a",
+          "to": "s_check",
+          "labels": [{ "read": "Y", "write": "Y", "move": "R" }]
+        },
+        {
+          "id": "t_empty",
+          "from": "s_mark_a",
+          "to": "s_accept",
+          "labels": [{ "read": "#", "write": "#", "move": "N" }]
+        },
+        {
+          "id": "t_check",
+          "from": "s_check",
+          "to": "s_check",
+          "labels": [
+            { "read": "Y", "write": "Y", "move": "R" },
+            { "read": "Z", "write": "Z", "move": "R" }
+          ]
+        },
+        {
+          "id": "t_accept",
+          "from": "s_check",
+          "to": "s_accept",
+          "labels": [{ "read": "#", "write": "#", "move": "N" }]
+        }
+      ]
+    }
+  }
+}

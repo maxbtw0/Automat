@@ -1,0 +1,39 @@
+/*
+ * Farben und Schriften im Claude-Stil: warme dunkle Grautöne, Terrakotta als Akzent,
+ * Überschriften in Serifenschrift. Alle Komponenten benutzen nur diese Variablen.
+ */
+:root {
+  color-scheme: dark;
+
+  --bg: #1f1e1d;
+  --bg-canvas: #262624;
+  --panel: #2a2927;
+  --panel-raised: #33322f;
+  --border: #3a3935;
+  --border-strong: #4a4843;
+
+  --text: #f0eee6;
+  --text-dim: #b8b5aa;
+  --text-faint: #858279;
+
+  --accent: #d97757;
+  --accent-soft: rgba(217, 119, 87, 0.16);
+  /* Text auf Akzent-Flächen (z. B. Hauptknopf) */
+  --accent-contrast: #1f1e1d;
+  --success: #8cbf73;
+  --success-soft: rgba(140, 191, 115, 0.16);
+  --danger: #e5534b;
+  --danger-soft: rgba(229, 83, 75, 0.16);
+  --warning: #e8b75c;
+  --warning-soft: rgba(232, 183, 92, 0.18);
+
+  --state-fill: #2e2d2a;
+  --state-stroke: #d6d3c8;
+  --edge: #9c998f;
+  --grid-dot: #36352f;
+
+  --radius: 8px;
+  --font: 'Segoe UI', system-ui, sans-serif;
+  --serif: 'Tiempos Text', 'Copernicus', Georgia, 'Times New Roman', serif;
+  --mono: 'Cascadia Code', Consolas, 'Courier New', monospace;
+}

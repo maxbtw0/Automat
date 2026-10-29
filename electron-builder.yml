@@ -1,0 +1,19 @@
+appId: de.automat.editor
+productName: Automat
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+  - package.json
+win:
+  target: nsis
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  # Für alle Benutzer nach C:\Program Files (fragt einmal nach Adminrechten)
+  perMachine: true
+  include: build/installer.nsh
+  allowToChangeInstallationDirectory: true
+  # Ein Installer pro Architektur: x64 (Intel/AMD) und arm64
+  artifactName: ${productName} Setup ${version} ${arch}.${ext}

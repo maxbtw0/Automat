@@ -1,0 +1,176 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AutomatApi } from '@shared/ipc'
+import { createEmptyDocument } from '@/model/graph'
+import { deserializeDocument } from '@/model/serialization'
+import { useDialogStore } from '@/store/dialogStore'
+import { useEditorStore } from '@/store/editorStore'
+import {
+  closeWindow,
+  confirmDiscard,
+  displayName,
+  newFile,
+  runMenuAction,
+  saveFile
+} from './fileActions'
+
+describe('displayName', () => {
+  it('nimmt den Dateinamen ohne Ordner und Endung', () => {
+    expect(displayName('C:\\Users\\max\\Automaten\\gerade-as.json')).toBe('gerade-as')
+    expect(displayName('/home/max/dea.automat.json')).toBe('dea.automat')
+    expect(displayName('nur-name.json')).toBe('nur-name')
+  })
+
+  it('liefert „Unbenannt“ ohne Datei', () => {
+    expect(displayName(null)).toBe('Unbenannt')
+  })
+})
+
+describe('Rückfrage bei ungespeicherten Änderungen', () => {
+  const store = () => useEditorStore.getState()
+  const dialog = () => useDialogStore.getState()
+  const api = {
+    saveFile: vi.fn<AutomatApi['saveFile']>(),
+    closeWindow: vi.fn<AutomatApi['closeWindow']>()
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('window', { api })
+    api.saveFile.mockReset().mockResolvedValue('/automaten/dea.json')
+    api.closeWindow.mockReset()
+    store().newDocument()
+    store().addState(0, 0)
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  /** Wartet, bis der Dialog offen ist, und drückt Knopf `index`. */
+  async function answer(index: number): Promise<void> {
+    await vi.waitFor(() => expect(dialog().request).not.toBeNull())
+    dialog().answer(index)
+  }
+
+  it('fragt nicht, wenn alles gespeichert ist', async () => {
+    store().markSaved(null)
+    expect(await confirmDiscard()).toBe(true)
+    expect(dialog().request).toBeNull()
+  })
+
+  it('bietet Speichern, Nicht speichern und Abbrechen an', async () => {
+    const done = confirmDiscard()
+    expect(dialog().request?.title).toBe('Änderungen an „Unbenannt“ speichern?')
+    expect(dialog().request?.buttons).toEqual(['Speichern', 'Nicht speichern', 'Abbrechen'])
+    await answer(2)
+    expect(await done).toBe(false)
+  })
+
+  it('„Speichern“ speichert und fährt fort', async () => {
+    const done = confirmDiscard()
+    await answer(0)
+    expect(await done).toBe(true)
+    expect(api.saveFile).toHaveBeenCalledOnce()
+    expect(store().dirty).toBe(false)
+  })
+
+  it('abgebrochenes Speichern hält an', async () => {
+    api.saveFile.mockResolvedValue(null)
+    const done = confirmDiscard()
+    await answer(0)
+    expect(await done).toBe(false)
+    expect(store().dirty).toBe(true)
+  })
+
+  it('„Neu“ mit „Nicht speichern“ verwirft den Automaten', async () => {
+    const done = newFile()
+    await answer(1)
+    await done
+    expect(store().document.graph.states).toHaveLength(0)
+    expect(api.saveFile).not.toHaveBeenCalled()
+  })
+
+  it('„Neu“ mit „Abbrechen“ behält den Automaten', async () => {
+    const done = newFile()
+    await answer(2)
+    await done
+    expect(store().document.graph.states).toHaveLength(1)
+  })
+
+  it('Schließen geht erst nach der Antwort', async () => {
+    const done = closeWindow()
+    expect(api.closeWindow).not.toHaveBeenCalled()
+    await answer(1)
+    await done
+    expect(api.closeWindow).toHaveBeenCalledOnce()
+  })
+
+  it('Schließen mit „Abbrechen“ lässt das Fenster offen', async () => {
+    const done = closeWindow()
+    await answer(2)
+    await done
+    expect(api.closeWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('Speichern während weiterer Änderungen', () => {
+  const store = () => useEditorStore.getState()
+  let finish: (path: string | null) => void = () => {}
+  let saved = ''
+
+  beforeEach(() => {
+    const saveFile: AutomatApi['saveFile'] = (content) => {
+      saved = content
+      return new Promise((resolve) => (finish = resolve))
+    }
+    vi.stubGlobal('window', { api: { saveFile } })
+    store().newDocument()
+    store().addState(0, 0)
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('Änderungen während des Schreibens bleiben ungespeichert', async () => {
+    const pending = saveFile()
+    store().addState(100, 0)
+    finish('/automaten/dea.json')
+    await pending
+
+    expect(deserializeDocument(saved).graph.states).toHaveLength(1)
+    expect(store().filePath).toBe('/automaten/dea.json')
+    expect(store().dirty).toBe(true)
+    store().undo()
+    expect(store().dirty).toBe(false)
+  })
+
+  it('ein inzwischen geöffnetes Dokument behält seinen Pfad', async () => {
+    const pending = saveFile()
+    store().loadDocument(createEmptyDocument('NFA'), '/automaten/nea.json')
+    finish('/automaten/dea.json')
+    await pending
+
+    expect(store().filePath).toBe('/automaten/nea.json')
+    expect(store().dirty).toBe(false)
+  })
+})
+
+describe('Menüaktionen bei offenem Fenster', () => {
+  const store = () => useEditorStore.getState()
+
+  beforeEach(() => store().newDocument())
+  afterEach(() => useDialogStore.setState({ exportOpen: false }))
+
+  it('löschen nichts hinter dem Export-Fenster', () => {
+    const id = store().addState(0, 0)
+    store().select({ kind: 'state', id })
+    useDialogStore.getState().setExportOpen(true)
+
+    runMenuAction('delete')
+    runMenuAction('undo')
+    expect(store().document.graph.states).toHaveLength(1)
+  })
+
+  it('wirken ohne offenes Fenster wie gewohnt', () => {
+    const id = store().addState(0, 0)
+    store().select({ kind: 'state', id })
+    runMenuAction('delete')
+    expect(store().document.graph.states).toHaveLength(0)
+  })
+})
