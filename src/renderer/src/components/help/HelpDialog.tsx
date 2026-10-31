@@ -14,6 +14,8 @@ function tabLabel(tab: HelpTab): string {
       return 'Speichern'
     case 'tooltips':
       return 'Tooltips'
+    case 'program':
+      return 'Programm'
   }
 }
 

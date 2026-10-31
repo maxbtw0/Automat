@@ -4,6 +4,7 @@ import type { AutomatonType } from '@/model/graph'
 import { useSettingsStore } from '@/store/settingsStore'
 import { EXAMPLE_FILE } from './helpExample'
 import type { HelpTab } from './helpTabs'
+import { CHANGELOG, PROGRAM, formatChangelogDate } from './programInfo'
 
 export function HelpPage({ tab }: { tab: HelpTab }) {
   switch (tab.kind) {
@@ -28,6 +29,15 @@ export function HelpPage({ tab }: { tab: HelpTab }) {
         <article className="help-page">
           <h3 className="help-title">Tooltips</h3>
           <TooltipsPage />
+        </article>
+      )
+    case 'program':
+      return (
+        <article className="help-page">
+          <h3 className="help-title">
+            {PROGRAM.name} <span className="help-version">Version {PROGRAM.version}</span>
+          </h3>
+          <ProgramPage />
         </article>
       )
   }
@@ -585,6 +595,46 @@ function TooltipsPage() {
             [<kbd key="x">Esc</kbd>, 'abbrechen']
           ]}
         />
+      </Section>
+    </>
+  )
+}
+
+// ---------- Programm ----------
+
+function ProgramPage() {
+  return (
+    <>
+      <p>
+        Desktop-Programm zum Zeichnen, Prüfen, Simulieren, Umwandeln und Exportieren von Automaten:
+        endliche Akzeptoren (DEA, NEA), Kellerautomaten (DKA, NKA) und Turingmaschinen.
+      </p>
+      <Parts
+        rows={[
+          ['Autor', PROGRAM.author],
+          ['Lizenz', PROGRAM.license],
+          ['Technik', 'Electron, React, TypeScript'],
+          [
+            'Quellcode',
+            <a key="gh" href={PROGRAM.repository} target="_blank" rel="noreferrer">
+              {PROGRAM.repository.replace('https://', '')}
+            </a>
+          ]
+        ]}
+      />
+      <Section title="Changelog">
+        {CHANGELOG.map((entry) => (
+          <div key={entry.version} className="help-release">
+            <h5 className="help-release-title">
+              {entry.version} <span className="help-dim">{formatChangelogDate(entry.date)}</span>
+            </h5>
+            <ul>
+              {entry.changes.map((change) => (
+                <li key={change}>{change}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </Section>
     </>
   )

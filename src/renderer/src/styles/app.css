@@ -769,6 +769,31 @@ h4 {
 .help-dim {
   color: var(--text-faint);
 }
+.help-version {
+  margin-left: 6px;
+  color: var(--text-faint);
+  font-family: var(--font);
+  font-size: 13px;
+}
+.help-page a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.help-page a:hover {
+  text-decoration: underline;
+}
+.help-release {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+.help-release-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 500;
+}
 .keybindings {
   display: flex;
   flex-direction: column;

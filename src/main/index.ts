@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  shell,
+  type MenuItemConstructorOptions
+} from 'electron'
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import iconIco from '../../build/icon.ico?asset'
@@ -73,6 +81,11 @@ function createWindow(): BrowserWindow {
   })
 
   win.once('ready-to-show', () => win.show())
+  // Links (z. B. GitHub in der Hilfe) öffnen im Standardbrowser statt in einem neuen Fenster
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
   win.on('close', (event) => {
     if (!dirtyWindows.has(win)) return
     event.preventDefault()
