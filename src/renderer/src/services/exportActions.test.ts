@@ -5,7 +5,7 @@ import { buildDocument } from '@/core/automaton/testing'
 import { A4 } from '@/export/svg'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
-import { defaultExportArea, planExport } from './exportActions'
+import { FORMATS, defaultExportArea, planExport } from './exportActions'
 
 /** Gerade Anzahl a */
 const evenAs = buildDocument('DFA', ['a', 'b'], { start: 'q0', finals: ['q0'] }, [
@@ -86,6 +86,36 @@ describe('Seitenformat', () => {
     expect(table.height).toBeGreaterThan(A4.portrait.height)
     expect(planExport('graph', 'png', 'light').pages[0].width).toBeLessThan(A4.landscape.width)
     expect(planExport('simulationTable', 'csv', 'light').pages).toHaveLength(1)
+  })
+})
+
+describe('Alles exportieren', () => {
+  it('PDF: Graph quer, dahinter alle Tabellen nebeneinander auf einer Querseite', () => {
+    const { table, pages } = planExport('all', 'pdf', 'light')
+    expect(table).toBeNull()
+    expect(pages).toHaveLength(2)
+    expect(pages.every((p) => p.width === A4.landscape.width)).toBe(true)
+    const sheet = pages[1].svg
+    for (const title of ['Alphabet', 'Übergangstabelle', 'Simulation „aba“', 'Akzeptiert']) {
+      expect(sheet).toContain(title)
+    }
+  })
+
+  it('PDF: lange Tabellen laufen in weiteren Spalten und Seiten weiter', () => {
+    useScreenStore.setState({ simulationWord: 'ab'.repeat(60) })
+    const { pages } = planExport('all', 'pdf', 'light')
+    expect(pages.length).toBeGreaterThan(2)
+    expect(pages.every((p) => p.height === A4.landscape.height)).toBe(true)
+    const sheets = pages.slice(1).map((p) => p.svg).join('')
+    expect(sheets).toContain('(Fortsetzung)')
+    expect(sheets.match(/Akzeptiert/g)).toHaveLength(1)
+  })
+
+  it('PNG: ein Bild mit Graph und allen Tabellen, kein CSV', () => {
+    const { pages } = planExport('all', 'png', 'dark')
+    expect(pages).toHaveLength(1)
+    expect(pages[0].svg).toContain('Übergangstabelle')
+    expect(FORMATS.all).not.toContain('csv')
   })
 })
 

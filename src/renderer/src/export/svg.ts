@@ -435,6 +435,48 @@ export const A4: Record<Orientation, { width: number; height: number }> = {
 /** Seitenrand: 1 cm */
 const PAGE_MARGIN = 38
 
+/** Wie viele Zeilen eine Tabelle mit Titel, Untertitel und Ergebnis bei `scale` auf der Seite hat */
+export function tableRowsPerPage(orientation: Orientation, scale = 1): number {
+  const height = (A4[orientation].height - 2 * PAGE_MARGIN) / scale
+  const fixed = 2 * MARGIN + TITLE_HEIGHT + SUBTITLE_HEIGHT + RESULT_HEIGHT + ROW_HEIGHT
+  return Math.max(1, Math.floor((height - fixed) / ROW_HEIGHT))
+}
+
+/**
+ * Bilder nebeneinander auf A4-Seiten (oben bündig): so viele pro Seite, wie bei `minScale` in
+ * die Breite passen, der Rest auf die nächste Seite. Alle Seiten haben denselben Maßstab – höchstens
+ * `scale`, kleiner, wenn eine Seite sonst nicht passt (ein einzelnes zu breites Bild auch darunter).
+ */
+export function sideBySidePages(
+  images: SvgImage[],
+  orientation: Orientation,
+  { scale = 1, minScale = scale, gap = 24 }: { scale?: number; minScale?: number; gap?: number } = {}
+): SvgImage[] {
+  const page = {
+    width: A4[orientation].width - 2 * PAGE_MARGIN,
+    height: A4[orientation].height - 2 * PAGE_MARGIN
+  }
+  const width = page.width / minScale
+  const groups: SvgImage[][] = []
+  let used = 0
+  for (const image of images) {
+    const current = groups[groups.length - 1]
+    if (current && used + gap + image.width <= width) {
+      current.push(image)
+      used += gap + image.width
+    } else {
+      groups.push([image])
+      used = image.width
+    }
+  }
+  const rows = groups.map((group) => rowSvg(group, gap))
+  const common = rows.reduce(
+    (min, row) => Math.min(min, Math.max(minScale, page.width / row.width), page.height / row.height),
+    scale
+  )
+  return rows.map((row) => pageSvg(row, orientation, { maxScale: common }))
+}
+
 /**
  * Setzt ein Bild auf eine A4-Seite: horizontal zentriert, oben (`top`) oder in der Mitte
  * (`center`), zu große Bilder verkleinert, kleine bis `maxScale` vergrößert. Vorschau, PNG/JPG

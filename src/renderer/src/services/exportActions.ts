@@ -8,7 +8,9 @@ import {
   pageSvg,
   paragraphSvg,
   rowSvg,
+  sideBySidePages,
   stackFigureSvg,
+  tableRowsPerPage,
   tableSvg,
   tapeFigureSvg,
   type ExportTable,
@@ -45,6 +47,7 @@ export type ExportContent =
   | 'simulationTable'
   | 'simulationGraph'
   | 'simulationGraphTable'
+  | 'all'
 
 export const CONTENT_LABEL: Record<ExportContent, string> = {
   graph: 'Graph',
@@ -52,7 +55,8 @@ export const CONTENT_LABEL: Record<ExportContent, string> = {
   transitionTable: 'Übergangstabelle',
   simulationTable: 'Tabelle',
   simulationGraph: 'Graph als Bildfolge',
-  simulationGraphTable: 'Graph mit Tabelle'
+  simulationGraphTable: 'Graph mit Tabelle',
+  all: 'Alles'
 }
 
 const TABLE_FORMATS: ExportFormat[] = ['csv', 'png', 'jpg', 'pdf']
@@ -64,11 +68,12 @@ export const FORMATS: Record<ExportContent, ExportFormat[]> = {
   transitionTable: TABLE_FORMATS,
   simulationTable: TABLE_FORMATS,
   simulationGraph: IMAGE_FORMATS,
-  simulationGraphTable: IMAGE_FORMATS
+  simulationGraphTable: IMAGE_FORMATS,
+  all: IMAGE_FORMATS
 }
 
 /** Bereiche = Reiter im Export-Fenster, jeweils mit ihren möglichen Inhalten */
-export type ExportArea = 'graph' | 'alphabet' | 'transitionTable' | 'simulation'
+export type ExportArea = 'graph' | 'alphabet' | 'transitionTable' | 'simulation' | 'all'
 
 export const EXPORT_AREAS: { area: ExportArea; label: string; contents: ExportContent[] }[] = [
   { area: 'graph', label: 'Graph', contents: ['graph'] },
@@ -78,7 +83,8 @@ export const EXPORT_AREAS: { area: ExportArea; label: string; contents: ExportCo
     area: 'simulation',
     label: 'Simulation',
     contents: ['simulationTable', 'simulationGraph', 'simulationGraphTable']
-  }
+  },
+  { area: 'all', label: 'Alles', contents: ['all'] }
 ]
 
 export function areaContents(area: ExportArea): ExportContent[] {
@@ -103,11 +109,19 @@ const FILE_SUFFIX: Record<ExportContent, string> = {
   transitionTable: 'uebergangstabelle',
   simulationTable: 'simulation',
   simulationGraph: 'simulation-schritt',
-  simulationGraphTable: 'simulation'
+  simulationGraphTable: 'simulation',
+  all: 'alles'
 }
 
 /** Zeilen pro A4-Seite bei langen Tabellen (PDF) */
 const ROWS_PER_PAGE = 32
+
+/**
+ * „Alles“ als PDF: Tabellen nebeneinander auf A4 quer, etwas verkleinert – bei breiten Tabellen
+ * bis `SHEET_MIN_SCALE`, bevor eine Tabelle auf die nächste Seite rutscht
+ */
+const SHEET_SCALE = 0.85
+const SHEET_MIN_SCALE = 0.65
 
 export interface ExportOptions {
   /** Bildfolge: unter jedem Bild ein Satz, was in dem Schritt passiert */
@@ -217,6 +231,25 @@ function prepare(
   }
 
   const snapshot = simulationForExport(document)
+  if (content === 'all') {
+    const sorted = useScreenStore.getState().transitionTableSorted
+    const tables = [
+      alphabetTable(document),
+      transitionTable(document, sorted),
+      simulationTable(document, snapshot)
+    ].map(named)
+    const graph = layout.graph(graphSvg(document, null, { palette }))
+    if (format !== 'pdf') {
+      const row = rowSvg(tables.map((t) => tableSvg(t, palette)), 24)
+      return { table: null, pages: [columnSvg([graph, row], 24)] }
+    }
+    const columns = tables.flatMap((t) => sheetColumns(t).map((c) => tableSvg(c, palette)))
+    const sheets = sideBySidePages(columns, 'landscape', {
+      scale: SHEET_SCALE,
+      minScale: SHEET_MIN_SCALE
+    })
+    return { table: null, pages: [graph, ...sheets] }
+  }
   const last = snapshot.steps.length - 1
   const outcomeAt = (i: number): 'accepted' | 'rejected' | undefined =>
     i === last ? snapshot.outcome : undefined
@@ -271,6 +304,19 @@ function prepare(
   const table = named(simulationTable(document, snapshot, { markCurrent: true }))
   if (format === 'pdf') return { table: null, pages: [layout.graph(graph), ...layout.table(table)] }
   return { table: null, pages: [columnSvg([graph, tableSvg(table, palette)], 16)] }
+}
+
+/**
+ * Teilt eine Tabelle in gleich lange Spalten für eine Querseite. Fortsetzungen tragen den Titel
+ * mit „(Fortsetzung)“, damit die Kopfzeilen nebeneinander auf einer Höhe liegen.
+ */
+function sheetColumns(table: ExportTable): ExportTable[] {
+  const perPage = tableRowsPerPage('landscape', SHEET_SCALE)
+  const count = Math.max(1, Math.ceil(table.rows.length / perPage))
+  const rows = Math.max(1, Math.ceil(table.rows.length / count))
+  return paginateTable(table, rows).map((column, i) =>
+    i === 0 ? column : { ...column, title: `${table.title} (Fortsetzung)` }
+  )
 }
 
 export interface ExportPlan {
