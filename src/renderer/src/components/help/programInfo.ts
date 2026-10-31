@@ -11,8 +11,6 @@ export const PROGRAM = {
 
 export interface ChangelogEntry {
   version: string
-  /** Datum im Format JJJJ-MM-TT */
-  date: string
   changes: string[]
 }
 
@@ -20,7 +18,6 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.0.1',
-    date: '2026-10-31',
     changes: [
       'Angefangene Eingaben werden vor Neu, Öffnen, Speichern, Export und Schließen übernommen',
       'Reguläre Ausdrücke trennen Symbole mit mehreren Zeichen durch Leerzeichen',
@@ -30,7 +27,6 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '1.0.0',
-    date: '2026-10-29',
     changes: [
       'Erste Version: DEA, NEA, Kellerautomat (DKA, NKA) und Turingmaschine',
       'Grapheneditor, Alphabet, Übergangstabelle, Simulation und reguläre Ausdrücke',
@@ -38,9 +34,3 @@ export const CHANGELOG: ChangelogEntry[] = [
     ]
   }
 ]
-
-/** „2026-10-31“ → „31.10.2026“ */
-export function formatChangelogDate(date: string): string {
-  const [year, month, day] = date.split('-')
-  return `${day}.${month}.${year}`
-}

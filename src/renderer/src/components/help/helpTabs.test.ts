@@ -5,7 +5,7 @@ import { deserializeDocument } from '@/model/serialization'
 import { version } from '../../../../../package.json'
 import { EXAMPLE_FILE } from './helpExample'
 import { HELP_GROUPS, helpTabKey, initialHelpTab } from './helpTabs'
-import { CHANGELOG, PROGRAM, formatChangelogDate } from './programInfo'
+import { CHANGELOG, PROGRAM } from './programInfo'
 
 describe('Hilfe-Reiter', () => {
   const tabs = HELP_GROUPS.flatMap((g) => g.tabs)
@@ -49,14 +49,8 @@ describe('Programm-Reiter', () => {
     expect(CHANGELOG[0].version).toBe(version)
   })
 
-  it('hat jede Version nur einmal, neueste zuerst', () => {
+  it('hat jede Version nur einmal', () => {
     const versions = CHANGELOG.map((entry) => entry.version)
     expect(new Set(versions).size).toBe(versions.length)
-    const dates = CHANGELOG.map((entry) => entry.date)
-    expect([...dates].sort().reverse()).toEqual(dates)
-  })
-
-  it('schreibt das Datum deutsch', () => {
-    expect(formatChangelogDate('2026-10-31')).toBe('31.10.2026')
   })
 })
