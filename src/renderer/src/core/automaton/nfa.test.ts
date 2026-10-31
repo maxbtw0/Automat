@@ -39,6 +39,16 @@ describe('NFA.accepts', () => {
   it('verwirft Zeichen, die nicht in Σ sind', () => {
     expect(new NFA(endsWithAb).accepts('acb')).toBe(false)
   })
+
+  it('liest „ε“ im Wort nicht über einen ε-Übergang', () => {
+    const doc = buildDocument('NFA', ['a'], { start: 'q0', finals: ['q1'] }, [
+      ['q0', EPSILON, 'q1']
+    ])
+    const nfa = new NFA(doc)
+    expect(nfa.accepts('')).toBe(true)
+    expect(nfa.accepts(EPSILON)).toBe(false)
+    expect(new NFA(withEpsilon).accepts(`${EPSILON}a`)).toBe(false)
+  })
 })
 
 describe('NFA-Simulator', () => {

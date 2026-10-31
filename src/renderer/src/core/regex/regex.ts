@@ -125,34 +125,47 @@ export function escapeSymbol(symbol: string): string {
   return [...symbol].map((c) => (SPECIAL.has(c) || /\s/.test(c) ? ESCAPE + c : c)).join('')
 }
 
-/** Ausgabe in Stücken, damit die Oberfläche den Stern hochstellen kann. */
-export function formatRegexParts(regex: Regex): RegexPart[] {
-  const inner = (r: Regex, minPrecedence: number): RegexPart[] => {
-    const parts = formatRegexParts(r)
-    return PRECEDENCE[r.kind] < minPrecedence ? [{ text: '(' }, ...parts, { text: ')' }] : parts
+/**
+ * Ausgabe in Stücken, damit die Oberfläche den Stern hochstellen kann.
+ *
+ * Hat ein Symbol (aus `alphabet` oder dem Ausdruck) mehrere Zeichen, stehen zwischen den Teilen
+ * einer Verkettung Leerzeichen – sonst liest `parseRegex` z. B. „a“ „b“ bei Σ = {a, b, ab} als
+ * das eine Symbol „ab“.
+ */
+export function formatRegexParts(regex: Regex, alphabet: string[] = []): RegexPart[] {
+  const separate = [...alphabet, ...regexSymbols(regex)].some((s) => [...s].length > 1)
+  const format = (r: Regex): RegexPart[] => {
+    const inner = (p: Regex, minPrecedence: number): RegexPart[] => {
+      const parts = format(p)
+      return PRECEDENCE[p.kind] < minPrecedence ? [{ text: '(' }, ...parts, { text: ')' }] : parts
+    }
+    switch (r.kind) {
+      case 'empty':
+        return [{ text: EMPTY_SET }]
+      case 'epsilon':
+        return [{ text: EPSILON }]
+      case 'symbol':
+        return [{ text: escapeSymbol(r.symbol) }]
+      case 'union':
+        return r.parts.flatMap((p, i) => [
+          ...(i > 0 ? [{ text: UNION_SYMBOL }] : []),
+          ...inner(p, 1)
+        ])
+      case 'concat':
+        return r.parts.flatMap((p, i) => [
+          ...(i > 0 && separate ? [{ text: ' ' }] : []),
+          ...inner(p, 2)
+        ])
+      case 'star':
+        return [...inner(r.inner, 3), { text: '*', sup: true }]
+    }
   }
-  switch (regex.kind) {
-    case 'empty':
-      return [{ text: EMPTY_SET }]
-    case 'epsilon':
-      return [{ text: EPSILON }]
-    case 'symbol':
-      return [{ text: escapeSymbol(regex.symbol) }]
-    case 'union':
-      return regex.parts.flatMap((p, i) => [
-        ...(i > 0 ? [{ text: UNION_SYMBOL }] : []),
-        ...inner(p, 1)
-      ])
-    case 'concat':
-      return regex.parts.flatMap((p) => inner(p, 2))
-    case 'star':
-      return [...inner(regex.inner, 3), { text: '*', sup: true }]
-  }
+  return format(regex)
 }
 
-/** Text mit möglichst wenigen Klammern, z. B. „(a+b)*ab“. */
-export function formatRegex(regex: Regex): string {
-  return formatRegexParts(regex)
+/** Text mit möglichst wenigen Klammern, z. B. „(a+b)*ab“ oder „x1 x2*“. */
+export function formatRegex(regex: Regex, alphabet: string[] = []): string {
+  return formatRegexParts(regex, alphabet)
     .map((p) => p.text)
     .join('')
 }

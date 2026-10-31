@@ -57,7 +57,7 @@ export function RegularExpressionScreen() {
   }, [doc, compareInput])
 
   const copy = (regex: Regex): void => {
-    void navigator.clipboard.writeText(formatRegex(regex)).then(() => {
+    void navigator.clipboard.writeText(formatRegex(regex, doc.alphabet)).then(() => {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     })
@@ -164,9 +164,10 @@ export function RegularExpressionScreen() {
 
 /** Regulärer Ausdruck mit hochgestelltem Kleene-Stern */
 function RegexText({ regex, className }: { regex: Regex; className?: string }) {
+  const alphabet = useEditorStore((s) => s.document.alphabet)
   return (
     <code className={className}>
-      {formatRegexParts(regex).map((part, i) =>
+      {formatRegexParts(regex, alphabet).map((part, i) =>
         part.sup ? <sup key={i}>{part.text}</sup> : <span key={i}>{part.text}</span>
       )}
     </code>

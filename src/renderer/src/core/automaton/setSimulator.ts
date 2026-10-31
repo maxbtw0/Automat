@@ -40,6 +40,8 @@ export function epsilonClosure(graph: EditorGraph, states: Iterable<StateId>): S
 export function move(graph: EditorGraph, states: Set<StateId>, symbol: string): StateSetResult {
   const result = new Set<StateId>()
   const used: TransitionId[] = []
+  // ε ist kein Eingabesymbol – ε-Übergänge lesen nichts
+  if (symbol === EPSILON) return { states: result, transitionIds: used }
   for (const t of graph.transitions) {
     if (states.has(t.from) && readsSymbol(t, symbol)) {
       result.add(t.to)
@@ -135,8 +137,9 @@ export class StateSetSimulator implements Simulator {
     for (const symbol of this.tokens) {
       const previous = layers[layers.length - 1].states
       if (previous.size === 0) break
+      // Ein „ε“ im Wort liegt nie in Σ: kein Übergang liest es, auch kein ε-Übergang
       const moves = graph.transitions.filter(
-        (t) => previous.has(t.from) && readsSymbol(t, symbol)
+        (t) => symbol !== EPSILON && previous.has(t.from) && readsSymbol(t, symbol)
       )
       const states = closure(moves.map((t) => t.to))
       layers.push({ states, moves, epsilons: epsilonsFrom(states) })

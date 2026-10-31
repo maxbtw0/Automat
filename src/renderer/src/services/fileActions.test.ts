@@ -102,6 +102,39 @@ describe('Rückfrage bei ungespeicherten Änderungen', () => {
     expect(api.closeWindow).toHaveBeenCalledOnce()
   })
 
+  describe('angefangene Eingabe', () => {
+    /** Ein Eingabefeld mit Fokus, das beim Fokusverlust den Zustand umbenennt (wie CommitInput) */
+    function focusInputThatRenames(label: string): void {
+      const id = store().document.graph.states[0].id
+      class Input {
+        blur(): void {
+          store().updateState(id, { label })
+        }
+      }
+      vi.stubGlobal('HTMLElement', Input)
+      vi.stubGlobal('HTMLInputElement', Input)
+      vi.stubGlobal('document', { activeElement: new Input() })
+    }
+
+    beforeEach(() => store().markSaved(null))
+
+    it('„Neu“ übernimmt sie und fragt dann nach', async () => {
+      focusInputThatRenames('neu')
+      const done = newFile()
+      await answer(2)
+      await done
+      expect(store().document.graph.states[0].label).toBe('neu')
+    })
+
+    it('Speichern schreibt sie mit', async () => {
+      focusInputThatRenames('neu')
+      await saveFile()
+      const [content] = api.saveFile.mock.calls[0]
+      expect(deserializeDocument(content).graph.states[0].label).toBe('neu')
+      expect(store().dirty).toBe(false)
+    })
+  })
+
   it('Schließen mit „Abbrechen“ lässt das Fenster offen', async () => {
     const done = closeWindow()
     await answer(2)

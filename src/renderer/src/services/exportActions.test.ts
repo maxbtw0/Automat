@@ -1,4 +1,6 @@
+import { DEFAULT_SIMULATION } from '@shared/simulationSettings'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { setSimulationLimits } from '@/core/automaton/limits'
 import { buildDocument } from '@/core/automaton/testing'
 import { A4 } from '@/export/svg'
 import { useEditorStore } from '@/store/editorStore'
@@ -47,6 +49,18 @@ describe('Simulation exportieren', () => {
     const { pages } = planExport('simulationGraphTable', 'pdf', 'light')
     expect(pages.map((p) => p.width)).toEqual([A4.landscape.width, A4.portrait.width])
     expect(planExport('simulationGraphTable', 'png', 'light').pages).toHaveLength(1)
+  })
+
+  it('Graph mit Tabelle schafft auch sehr lange Läufe', () => {
+    const loop = buildDocument('TM', ['a'], { start: 'q0', finals: [] }, [['q0', '# → #, N', 'q0']])
+    useEditorStore.getState().loadDocument(loop, null)
+    useScreenStore.setState({ simulationWord: '' })
+    setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: 150_000 })
+    try {
+      expect(planExport('simulationGraphTable', 'png', 'light').pages).toHaveLength(1)
+    } finally {
+      setSimulationLimits(DEFAULT_SIMULATION)
+    }
   })
 
   it('meldet, warum es nicht geht', () => {

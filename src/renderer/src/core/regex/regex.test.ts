@@ -82,7 +82,7 @@ describe('vereinfachende Konstruktoren', () => {
 describe('Symbole mit Operator-Zeichen', () => {
   it('maskiert Operator-Zeichen in Symbolen mit \\', () => {
     expect(formatRegex(symbol('('))).toBe('\\(')
-    expect(formatRegex(concat(symbol('a+'), star(symbol('*'))))).toBe('a\\+\\**')
+    expect(formatRegex(concat(symbol('a+'), star(symbol('*'))))).toBe('a\\+ \\**')
     expect(formatRegex(symbol('x1'))).toBe('x1')
   })
 
@@ -93,6 +93,17 @@ describe('Symbole mit Operator-Zeichen', () => {
     }
     const r = union(concat(symbol('('), star(symbol('a+'))), symbol(')'))
     expect(parseRegex(formatRegex(r), alphabet)).toEqual(r)
+  })
+
+  it('trennt verkettete Symbole, wenn ein Symbol mehrere Zeichen hat', () => {
+    const alphabet = ['a', 'b', 'ab']
+    const r = concat(symbol('a'), star(symbol('b')))
+    expect(formatRegex(r)).toBe('ab*')
+    expect(formatRegex(r, alphabet)).toBe('a b*')
+    expect(parseRegex(formatRegex(r, alphabet), alphabet)).toEqual(r)
+    const both = union(concat(symbol('a'), symbol('b')), symbol('ab'))
+    expect(formatRegex(both, alphabet)).toBe('a b+ab')
+    expect(parseRegex(formatRegex(both, alphabet), alphabet)).toEqual(both)
   })
 
   it('\\x ist auch ohne Alphabet das Zeichen x, ein einzelnes \\ am Ende ist ein Fehler', () => {

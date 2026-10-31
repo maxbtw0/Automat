@@ -33,6 +33,7 @@ import { tapeSettings, type AutomatonDocument } from '@/model/graph'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore, type Screen } from '@/store/screenStore'
+import { commitActiveInput } from '@/utils/dom'
 import { displayName } from './fileActions'
 
 export type ExportFormat = 'csv' | 'png' | 'jpg' | 'pdf'
@@ -222,7 +223,8 @@ function prepare(
 
   if (content === 'simulationTable') return tableOnly(simulationTable(document, snapshot))
   // Kellerautomat: Stack rechts neben dem Graphen, in der Bildfolge überall gleich hoch
-  const minCells = Math.max(1, ...snapshot.steps.map((s) => s.stack?.length ?? 0))
+  // (Schleife statt Math.max(...steps) – zu viele Argumente sprengen den Aufrufstack)
+  const minCells = snapshot.steps.reduce((max, s) => Math.max(max, s.stack?.length ?? 0), 1)
   // Turingmaschine: Band über dem Graphen, in der Bildfolge überall derselbe Ausschnitt
   const tapeRange = tapeRangeOf(snapshot.steps)
   const { blank } = tapeSettings(document)
@@ -362,5 +364,6 @@ function printInBrowser(html: string): void {
 
 /** Öffnet das Export-Fenster (mit dem Reiter des aktuellen Screens). */
 export function openExportDialog(): void {
+  commitActiveInput()
   useDialogStore.getState().setExportOpen(true)
 }

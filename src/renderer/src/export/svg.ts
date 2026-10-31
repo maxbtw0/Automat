@@ -265,12 +265,14 @@ const MARGIN = 16
 export function tableSvg(table: ExportTable, palette: Palette = LIGHT): SvgImage {
   const P = palette
   const fontOf = (column: ExportColumn): string => (column.mono ? MONO : FONT)
-  const widths = table.columns.map((column, c) =>
-    Math.max(
-      48,
-      measureText(column.title, FONT, TEXT_SIZE) + 8,
-      ...table.rows.map((row) => measureText(row[c] ?? '', fontOf(column), TEXT_SIZE))
-    ) + 2 * CELL_PAD
+  // Schleife statt Math.max(...rows) – sehr lange Tabellen sprengen sonst den Aufrufstack
+  const widths = table.columns.map(
+    (column, c) =>
+      table.rows.reduce(
+        (max, row) => Math.max(max, measureText(row[c] ?? '', fontOf(column), TEXT_SIZE)),
+        Math.max(48, measureText(column.title, FONT, TEXT_SIZE) + 8)
+      ) +
+      2 * CELL_PAD
   )
   const tableWidth = widths.reduce((a, b) => a + b, 0)
   const titleHeight =

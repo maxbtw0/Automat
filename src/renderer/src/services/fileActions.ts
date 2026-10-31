@@ -3,6 +3,7 @@ import { describeError } from '@/core/automaton/errors'
 import { deserializeDocument, serializeDocument } from '@/model/serialization'
 import { askChoice, isModalOpen } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
+import { commitActiveInput } from '@/utils/dom'
 import { openExportDialog } from './exportActions'
 import { openHelp } from './helpActions'
 import { createConfiguredDocument, openSettings } from './settingsActions'
@@ -21,6 +22,7 @@ export function displayName(filePath: string | null): string {
  * Liefert, ob es weitergehen darf (gespeichert oder bewusst verworfen).
  */
 export async function confirmDiscard(): Promise<boolean> {
+  commitActiveInput()
   const { dirty, filePath } = useEditorStore.getState()
   if (!dirty) return true
   const choice = await askChoice({
@@ -83,6 +85,7 @@ export async function openFile(): Promise<void> {
 }
 
 export async function saveFile(saveAs = false): Promise<void> {
+  commitActiveInput()
   const store = useEditorStore.getState()
   // Gespeichert wird dieser Stand – Änderungen während des Schreibens bleiben ungespeichert
   const { document, session } = store
