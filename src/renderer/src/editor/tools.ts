@@ -21,6 +21,13 @@ export const TOOLS: ToolDefinition[] = [
     hint: 'Klicken: auswählen · Ziehen: verschieben · Doppelklick auf Fläche: neuer Zustand · Leertaste/Mittelklick + Ziehen: Ansicht verschieben'
   },
   {
+    id: 'lasso',
+    label: 'Lasso',
+    icon: 'lasso',
+    keyAction: 'tool.lasso',
+    hint: 'Rechteck aufziehen: mehrere Elemente auswählen · Auswahl ziehen: verschieben'
+  },
+  {
     id: 'state',
     label: 'Zustand',
     icon: 'state',

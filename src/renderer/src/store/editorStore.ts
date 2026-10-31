@@ -29,15 +29,65 @@ import {
 } from '@/model/graph'
 
 export type { AlphabetKind } from '@/model/graph'
-import { clamp, type Viewport } from '@/utils/geometry'
+import { clamp, type Point, type Viewport } from '@/utils/geometry'
 import { sameTuringCell, setTuringCell, turingCell, type TuringCell } from '@/model/turingTable'
 
-export type Tool = 'select' | 'state' | 'transition' | 'delete'
+export type Tool = 'select' | 'lasso' | 'state' | 'transition' | 'delete'
 
 export type Selection =
   | { kind: 'state'; id: StateId }
   | { kind: 'transition'; id: TransitionId }
+  /** Mehrere Elemente (Lasso) – mindestens zwei */
+  | { kind: 'group'; stateIds: StateId[]; transitionIds: TransitionId[] }
   | null
+
+/** Auswahl aus beliebig vielen Elementen: keins → `null`, genau eins → Einzelauswahl. */
+export function groupSelection(stateIds: StateId[], transitionIds: TransitionId[]): Selection {
+  const count = stateIds.length + transitionIds.length
+  if (count === 0) return null
+  if (count > 1) return { kind: 'group', stateIds, transitionIds }
+  return stateIds.length
+    ? { kind: 'state', id: stateIds[0] }
+    : { kind: 'transition', id: transitionIds[0] }
+}
+
+/** Alle ausgewählten Elemente als Listen (für Gruppen und Einzelauswahl gleich). */
+export function selectedIds(selection: Selection): {
+  stateIds: StateId[]
+  transitionIds: TransitionId[]
+} {
+  if (!selection) return { stateIds: [], transitionIds: [] }
+  if (selection.kind === 'group') return selection
+  return selection.kind === 'state'
+    ? { stateIds: [selection.id], transitionIds: [] }
+    : { stateIds: [], transitionIds: [selection.id] }
+}
+
+/** Nimmt ein Element in die Auswahl auf oder entfernt es (Umschalt+Klick). */
+export function toggleSelected(
+  selection: Selection,
+  kind: 'state' | 'transition',
+  id: string
+): Selection {
+  const { stateIds, transitionIds } = selectedIds(selection)
+  const toggle = (ids: string[]): string[] =>
+    ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+  return kind === 'state'
+    ? groupSelection(toggle(stateIds), transitionIds)
+    : groupSelection(stateIds, toggle(transitionIds))
+}
+
+export function isSelected(
+  selection: Selection,
+  kind: 'state' | 'transition',
+  id: string
+): boolean {
+  if (!selection) return false
+  if (selection.kind === 'group') {
+    return (kind === 'state' ? selection.stateIds : selection.transitionIds).includes(id)
+  }
+  return selection.kind === kind && selection.id === id
+}
 
 /**
  * Element, das gerade direkt im Canvas bearbeitet wird (Umbenennen / Symbole).
@@ -144,6 +194,8 @@ interface EditorState {
   addState(x: number, y: number): StateId
   /** Verschiebt ohne Verlaufseintrag – vorher `snapshot()` aufrufen. */
   moveStateLive(id: StateId, x: number, y: number): void
+  /** Wie `moveStateLive`, für mehrere Zustände auf einmal. */
+  moveStatesLive(positions: ReadonlyMap<StateId, Point>): void
   updateState(id: StateId, patch: Partial<Omit<StateNode, 'id'>>): void
   setStartState(id: StateId): void
   toggleFinal(id: StateId): void
@@ -241,6 +293,19 @@ const mapLabels = (
 
 function validSelection(doc: AutomatonDocument, selection: Selection): Selection {
   if (!selection) return null
+  if (selection.kind === 'group') {
+    const states = new Set(doc.graph.states.map((s) => s.id))
+    const transitions = new Set(doc.graph.transitions.map((t) => t.id))
+    const stateIds = selection.stateIds.filter((id) => states.has(id))
+    const transitionIds = selection.transitionIds.filter((id) => transitions.has(id))
+    if (
+      stateIds.length === selection.stateIds.length &&
+      transitionIds.length === selection.transitionIds.length
+    ) {
+      return selection
+    }
+    return groupSelection(stateIds, transitionIds)
+  }
   const list = selection.kind === 'state' ? doc.graph.states : doc.graph.transitions
   return list.some((item) => item.id === selection.id) ? selection : null
 }
@@ -476,6 +541,16 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         }),
         dirty: true
       })),
+    moveStatesLive: (positions) =>
+      set((s) => ({
+        document: withGraph(s.document, {
+          states: s.document.graph.states.map((st) => {
+            const p = positions.get(st.id)
+            return p ? { ...st, x: p.x, y: p.y } : st
+          })
+        }),
+        dirty: true
+      })),
     updateState: (id, patch) =>
       commit((doc) =>
         withGraph(doc, {
@@ -601,6 +676,20 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       const { selection, deleteState, deleteTransition } = get()
       if (selection?.kind === 'state') deleteState(selection.id)
       else if (selection?.kind === 'transition') deleteTransition(selection.id)
+      else if (selection?.kind === 'group') {
+        // Ein Undo-Schritt für alles; Übergänge an gelöschten Zuständen verschwinden mit
+        const states = new Set(selection.stateIds)
+        const transitions = new Set(selection.transitionIds)
+        commit((doc) =>
+          withGraph(doc, {
+            states: doc.graph.states.filter((s) => !states.has(s.id)),
+            transitions: doc.graph.transitions.filter(
+              (t) => !transitions.has(t.id) && !states.has(t.from) && !states.has(t.to)
+            )
+          })
+        )
+        set({ selection: null, inlineEdit: null })
+      }
     }
   }
 })

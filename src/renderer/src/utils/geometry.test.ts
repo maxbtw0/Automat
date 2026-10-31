@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocument } from '@/core/automaton/testing'
-import { loopAngle, selfLoop } from './geometry'
+import { elementsInRect, loopAngle, selfLoop } from './geometry'
 
 const graphWith = (positions: Record<string, [number, number]>, edges: [string, string][]) => {
   const doc = buildDocument(
@@ -38,5 +38,18 @@ describe('selfLoop', () => {
     expect(up.label.y).toBeLessThan(0)
     expect(down.label.y).toBeCloseTo(-up.label.y)
     expect(down.label.x).toBeCloseTo(0)
+  })
+})
+
+describe('elementsInRect', () => {
+  it('nimmt Zustände mit Mittelpunkt im Rechteck und die Übergänge zwischen ihnen', () => {
+    const g = graphWith(
+      { p: [0, 0], q: [100, 0], r: [300, 0] },
+      [['p', 'q'], ['q', 'r'], ['q', 'q']]
+    )
+    const found = elementsInRect(g, { x: 150, y: 50 }, { x: -50, y: -50 })
+    expect(found.stateIds).toEqual(['p', 'q'])
+    const kept = g.transitions.filter((t) => found.transitionIds.includes(t.id))
+    expect(kept.map((t) => `${t.from}${t.to}`)).toEqual(['pq', 'qq'])
   })
 })

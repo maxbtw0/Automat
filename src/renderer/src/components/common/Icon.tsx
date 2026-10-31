@@ -6,6 +6,7 @@ const PATHS = {
   undo: 'M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
   redo: 'M15 14l5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13',
   select: 'M5 3l14 7-6 2-2 6z',
+  lasso: 'M4 7V4h3 M10.5 4h3 M17 4h3v3 M20 10.5v3 M20 17v3h-3 M13.5 20h-3 M7 20H4v-3 M4 13.5v-3',
   state: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z',
   transition: 'M5 19L19 5 M9 5h10v10',
   delete: 'M3 6h18 M8 6V4h8v2 M6 6l1 14h10l1-14',

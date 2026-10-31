@@ -27,6 +27,7 @@ export const KEY_ACTION_IDS = [
   'view.simulation',
   'view.resetViewport',
   'tool.select',
+  'tool.lasso',
   'tool.state',
   'tool.transition',
   'tool.delete',
@@ -148,6 +149,7 @@ export const KEY_ACTIONS: Record<KeyAction, KeyActionDefinition> = {
     defaults: ['Ctrl+0']
   },
   'tool.select': { label: 'Auswählen', group: 'Grapheneditor', scope: 'graph', defaults: ['V'] },
+  'tool.lasso': { label: 'Lasso', group: 'Grapheneditor', scope: 'graph', defaults: ['L'] },
   'tool.state': { label: 'Zustand', group: 'Grapheneditor', scope: 'graph', defaults: ['S'] },
   'tool.transition': { label: 'Übergang', group: 'Grapheneditor', scope: 'graph', defaults: ['A'] },
   'tool.delete': { label: 'Löschen', group: 'Grapheneditor', scope: 'graph', defaults: ['D'] },

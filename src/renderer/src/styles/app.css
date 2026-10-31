@@ -1162,7 +1162,11 @@ h4 {
 .canvas.tool-transition .state {
   cursor: alias;
 }
-.canvas.tool-select .state {
+.canvas.tool-lasso {
+  cursor: crosshair;
+}
+.canvas.tool-select .state,
+.canvas.tool-lasso .state {
   cursor: move;
 }
 .canvas.tool-delete .state,
@@ -1309,6 +1313,14 @@ h4 {
   stroke: var(--accent);
   stroke-width: 2;
   stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+.lasso-rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
   pointer-events: none;
 }
 

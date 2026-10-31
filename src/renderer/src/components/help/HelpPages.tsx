@@ -547,6 +547,9 @@ function TooltipsPage() {
             ['Doppelklick auf freie Fläche', 'neuer Zustand'],
             ['Doppelklick auf Zustand', 'umbenennen'],
             ['Doppelklick auf Übergang', 'Beschriftung bearbeiten'],
+            ['Lasso: Rechteck aufziehen', 'mehrere Zustände samt Übergängen auswählen'],
+            [<kbd key="u">Umschalt</kbd>, '+ Klick oder Lasso: zur Auswahl hinzufügen'],
+            ['Ausgewählte Gruppe ziehen', 'alle zusammen verschieben'],
             ['Rechtsklick', 'Kontextmenü (Startzustand, Endzustand, Löschen …)']
           ]}
         />

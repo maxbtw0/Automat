@@ -180,6 +180,30 @@ export function findStateAt(states: StateNode[], p: Point, r = STATE_RADIUS): St
   return undefined
 }
 
+/**
+ * Lasso: Zustände, deren Mittelpunkt im Rechteck zwischen `a` und `b` liegt, und die Übergänge
+ * zwischen ihnen.
+ */
+export function elementsInRect(
+  graph: EditorGraph,
+  a: Point,
+  b: Point
+): { stateIds: string[]; transitionIds: string[] } {
+  const [left, right] = [Math.min(a.x, b.x), Math.max(a.x, b.x)]
+  const [top, bottom] = [Math.min(a.y, b.y), Math.max(a.y, b.y)]
+  const inside = new Set(
+    graph.states
+      .filter((s) => s.x >= left && s.x <= right && s.y >= top && s.y <= bottom)
+      .map((s) => s.id)
+  )
+  return {
+    stateIds: [...inside],
+    transitionIds: graph.transitions
+      .filter((t) => inside.has(t.from) && inside.has(t.to))
+      .map((t) => t.id)
+  }
+}
+
 export function screenToWorld(viewport: Viewport, p: Point): Point {
   return { x: (p.x - viewport.x) / viewport.zoom, y: (p.y - viewport.y) / viewport.zoom }
 }

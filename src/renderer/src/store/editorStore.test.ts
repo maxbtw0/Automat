@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createEmptyDocument, symbolLabels } from '@/model/graph'
-import { useEditorStore } from './editorStore'
+import { groupSelection, isSelected, toggleSelected, useEditorStore } from './editorStore'
 
 const store = () => useEditorStore.getState()
 
@@ -356,5 +356,82 @@ describe('Turingmaschine', () => {
     const before = store().past.length
     store().setTuringCell(q0, '#', { to: q0, write: '#', move: 'N' })
     expect(store().past).toHaveLength(before)
+  })
+})
+
+describe('Mehrfachauswahl', () => {
+  /** p → q → r, p → r */
+  function setupThree(): { p: string; q: string; r: string; pq: string; qr: string; pr: string } {
+    const p = store().addState(0, 0)
+    const q = store().addState(100, 0)
+    const r = store().addState(200, 0)
+    const pq = store().addTransition(p, q)
+    const qr = store().addTransition(q, r)
+    const pr = store().addTransition(p, r)
+    return { p, q, r, pq, qr, pr }
+  }
+
+  it('groupSelection: keins → null, eins → Einzelauswahl, mehr → Gruppe', () => {
+    expect(groupSelection([], [])).toBeNull()
+    expect(groupSelection(['s'], [])).toEqual({ kind: 'state', id: 's' })
+    expect(groupSelection([], ['t'])).toEqual({ kind: 'transition', id: 't' })
+    expect(groupSelection(['s'], ['t'])).toEqual({
+      kind: 'group',
+      stateIds: ['s'],
+      transitionIds: ['t']
+    })
+  })
+
+  it('Umschalt+Klick nimmt auf und entfernt wieder', () => {
+    const one = toggleSelected({ kind: 'state', id: 'a' }, 'state', 'b')
+    expect(one).toEqual({ kind: 'group', stateIds: ['a', 'b'], transitionIds: [] })
+    expect(toggleSelected(one, 'state', 'a')).toEqual({ kind: 'state', id: 'b' })
+    expect(isSelected(one, 'state', 'b')).toBe(true)
+    expect(isSelected(one, 'transition', 'b')).toBe(false)
+  })
+
+  it('löscht eine Gruppe in einem Undo-Schritt, samt Übergängen an den Zuständen', () => {
+    const { p, q, r, qr } = setupThree()
+    const before = store().document
+    store().select({ kind: 'group', stateIds: [p, q], transitionIds: [] })
+    store().deleteSelection()
+
+    expect(store().document.graph.states.map((s) => s.id)).toEqual([r])
+    expect(store().document.graph.transitions).toEqual([])
+    expect(store().selection).toBeNull()
+
+    store().undo()
+    expect(store().document).toBe(before)
+    expect(store().document.graph.transitions.some((t) => t.id === qr)).toBe(true)
+  })
+
+  it('löscht ausgewählte Übergänge und lässt die anderen stehen', () => {
+    const { pq, qr, pr } = setupThree()
+    store().select({ kind: 'group', stateIds: [], transitionIds: [pq, qr] })
+    store().deleteSelection()
+    expect(store().document.graph.transitions.map((t) => t.id)).toEqual([pr])
+  })
+
+  it('verschiebt mehrere Zustände auf einmal', () => {
+    const { p, q, r } = setupThree()
+    store().moveStatesLive(
+      new Map([
+        [p, { x: 10, y: 20 }],
+        [q, { x: 110, y: 20 }]
+      ])
+    )
+    const pos = (id: string) => store().document.graph.states.find((s) => s.id === id)
+    expect(pos(p)).toMatchObject({ x: 10, y: 20 })
+    expect(pos(q)).toMatchObject({ x: 110, y: 20 })
+    expect(pos(r)).toMatchObject({ x: 200, y: 0 })
+  })
+
+  it('verkleinert die Gruppe, wenn Elemente verschwinden', () => {
+    const { p, q, pq } = setupThree()
+    store().select({ kind: 'group', stateIds: [p, q], transitionIds: [pq] })
+    store().deleteTransition(pq)
+    expect(store().selection).toEqual({ kind: 'group', stateIds: [p, q], transitionIds: [] })
+    store().deleteState(q)
+    expect(store().selection).toEqual({ kind: 'state', id: p })
   })
 })

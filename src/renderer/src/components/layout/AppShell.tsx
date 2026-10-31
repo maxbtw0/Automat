@@ -8,8 +8,8 @@ import { classNames } from '@/utils/dom'
 export function AppShell() {
   const tool = useEditorStore((s) => s.tool)
   const setTool = useEditorStore((s) => s.setTool)
-  // Seitenleiste nur bei Auswahl – sonst bekommt der Canvas die ganze Breite
-  const hasSelection = useEditorStore((s) => s.selection !== null)
+  // Seitenleiste nur bei einem ausgewählten Element – sonst bekommt der Canvas die ganze Breite
+  const hasSelection = useEditorStore((s) => s.selection !== null && s.selection.kind !== 'group')
   return (
     <div className={classNames('app-shell', !hasSelection && 'is-side-hidden')}>
       <nav className="area-tools">

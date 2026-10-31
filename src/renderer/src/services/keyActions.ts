@@ -80,6 +80,8 @@ export function runKeyAction(action: KeyAction): void {
       return store.resetViewport()
     case 'tool.select':
       return store.setTool('select')
+    case 'tool.lasso':
+      return store.setTool('lasso')
     case 'tool.state':
       return store.setTool('state')
     case 'tool.transition':

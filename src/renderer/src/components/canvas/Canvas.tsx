@@ -10,10 +10,19 @@ import {
   type StateNode,
   type TransitionEdge
 } from '@/model/graph'
-import { MAX_ZOOM, MIN_ZOOM, useEditorStore } from '@/store/editorStore'
+import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  groupSelection,
+  isSelected,
+  selectedIds,
+  toggleSelected,
+  useEditorStore
+} from '@/store/editorStore'
 import { classNames, isEditableTarget } from '@/utils/dom'
 import {
   clamp,
+  elementsInRect,
   findStateAt,
   previewEdgePath,
   screenToWorld,
@@ -36,6 +45,7 @@ type ContextMenuState =
   | { x: number; y: number; kind: 'state'; id: StateId }
   | { x: number; y: number; kind: 'transition'; id: string }
   | { x: number; y: number; kind: 'background'; world: Point }
+  | { x: number; y: number; kind: 'group' }
 
 interface CanvasProps {
   /** Nur ansehen: verschieben und zoomen ja, bearbeiten nein (z. B. in der Simulation) */
@@ -58,6 +68,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const [connectPreview, setConnectPreview] = useState<{ fromId: StateId; pointer: Point } | null>(
     null
   )
+  /** Lasso-Rechteck in Canvas-Koordinaten (Pixel) */
+  const [lasso, setLasso] = useState<{ a: Point; b: Point } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
@@ -264,22 +276,63 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     )
   }
 
-  const startDrag = (e: PointerEvent, state: StateNode): void => {
+  /** Verschiebt die Zustände `ids` gemeinsam; `onClick` = losgelassen, ohne zu ziehen. */
+  const startDrag = (e: PointerEvent, ids: StateId[], onClick?: () => void): void => {
     const pointer = clientToWorld(e.clientX, e.clientY)
-    const offset = { x: pointer.x - state.x, y: pointer.y - state.y }
+    const origins = useEditorStore
+      .getState()
+      .document.graph.states.filter((s) => ids.includes(s.id))
     const startX = e.clientX
     const startY = e.clientY
     let moved = false
-    trackPointer(e, (ev) => {
-      const store = useEditorStore.getState()
-      if (!moved) {
-        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return
-        moved = true
-        store.snapshot()
+    trackPointer(
+      e,
+      (ev) => {
+        const store = useEditorStore.getState()
+        if (!moved) {
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return
+          moved = true
+          store.snapshot()
+        }
+        const p = clientToWorld(ev.clientX, ev.clientY)
+        const dx = p.x - pointer.x
+        const dy = p.y - pointer.y
+        store.moveStatesLive(new Map(origins.map((s) => [s.id, { x: s.x + dx, y: s.y + dy }])))
+      },
+      () => {
+        if (!moved) onClick?.()
       }
-      const p = clientToWorld(ev.clientX, ev.clientY)
-      store.moveStateLive(state.id, p.x - offset.x, p.y - offset.y)
-    })
+    )
+  }
+
+  /** Rechteck aufziehen; mit Umschalt kommt der Inhalt zur bisherigen Auswahl dazu. */
+  const startLasso = (e: PointerEvent, additive: boolean): void => {
+    const store = useEditorStore.getState()
+    const base = additive ? selectedIds(store.selection) : { stateIds: [], transitionIds: [] }
+    if (!additive) store.select(null)
+    const a = containerPoint(e.clientX, e.clientY)
+    setLasso({ a, b: a })
+    trackPointer(
+      e,
+      (ev) => setLasso({ a, b: containerPoint(ev.clientX, ev.clientY) }),
+      (ev) => {
+        setLasso(null)
+        const { document, viewport: vp, select } = useEditorStore.getState()
+        const found = elementsInRect(
+          document.graph,
+          screenToWorld(vp, a),
+          clientToWorld(ev.clientX, ev.clientY)
+        )
+        const union = (x: string[], y: string[]): string[] => [...new Set([...x, ...y])]
+        select(
+          groupSelection(
+            union(base.stateIds, found.stateIds),
+            union(base.transitionIds, found.transitionIds)
+          )
+        )
+      },
+      () => setLasso(null)
+    )
   }
 
   const startConnect = (e: PointerEvent, from: StateNode): void => {
@@ -334,6 +387,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         store.select(null)
         startPan(e)
         break
+      case 'lasso':
+        startLasso(e, e.shiftKey)
+        break
       default:
         store.select(null)
     }
@@ -370,9 +426,20 @@ export function Canvas({ readOnly = false }: CanvasProps) {
       case 'transition':
         startConnect(e, state)
         break
-      default:
-        store.select({ kind: 'state', id: state.id })
-        startDrag(e, state)
+      default: {
+        if (e.shiftKey) {
+          store.select(toggleSelected(store.selection, 'state', state.id))
+          break
+        }
+        const single = (): void => store.select({ kind: 'state', id: state.id })
+        // Teil einer Gruppe → alle zusammen ziehen; nur angeklickt → nur dieser Zustand
+        if (store.selection?.kind === 'group' && isSelected(store.selection, 'state', state.id)) {
+          startDrag(e, store.selection.stateIds, single)
+        } else {
+          single()
+          startDrag(e, [state.id])
+        }
+      }
     }
   }
 
@@ -386,7 +453,12 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     e.preventDefault()
     e.stopPropagation()
     if (readOnly) return
-    useEditorStore.getState().select({ kind: 'state', id: state.id })
+    const store = useEditorStore.getState()
+    if (store.selection?.kind === 'group' && isSelected(store.selection, 'state', state.id)) {
+      setContextMenu({ ...containerPoint(e.clientX, e.clientY), kind: 'group' })
+      return
+    }
+    store.select({ kind: 'state', id: state.id })
     setContextMenu({ ...containerPoint(e.clientX, e.clientY), kind: 'state', id: state.id })
   }
 
@@ -398,6 +470,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     setContextMenu(null)
     const store = useEditorStore.getState()
     if (tool === 'delete') store.deleteTransition(t.id)
+    else if (e.shiftKey) store.select(toggleSelected(store.selection, 'transition', t.id))
     else store.select({ kind: 'transition', id: t.id })
   }
 
@@ -411,7 +484,12 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     e.preventDefault()
     e.stopPropagation()
     if (readOnly) return
-    useEditorStore.getState().select({ kind: 'transition', id: t.id })
+    const store = useEditorStore.getState()
+    if (store.selection?.kind === 'group' && isSelected(store.selection, 'transition', t.id)) {
+      setContextMenu({ ...containerPoint(e.clientX, e.clientY), kind: 'group' })
+      return
+    }
+    store.select({ kind: 'transition', id: t.id })
     setContextMenu({ ...containerPoint(e.clientX, e.clientY), kind: 'transition', id: t.id })
   }
 
@@ -439,6 +517,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           },
           { label: 'Löschen', danger: true, onSelect: () => store.deleteTransition(menu.id) }
         ]
+      case 'group':
+        return [{ label: 'Löschen', danger: true, onSelect: store.deleteSelection }]
       case 'background':
         return [
           {
@@ -594,7 +674,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
                 stackAlphabet={stackAlphabet}
                 transition={t}
                 geometry={geometry}
-                selected={!readOnly && selection?.kind === 'transition' && selection.id === t.id}
+                selected={!readOnly && isSelected(selection, 'transition', t.id)}
                 active={activeTransitions.has(t.id)}
                 onPointerDown={handleTransitionPointerDown}
                 onDoubleClick={handleTransitionDoubleClick}
@@ -612,7 +692,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
               key={pulseOf(s.id, pulse?.stateIds).key}
               pulseMs={pulseOf(s.id, pulse?.stateIds).pulseMs}
               state={s}
-              selected={!readOnly && selection?.kind === 'state' && selection.id === s.id}
+              selected={!readOnly && isSelected(selection, 'state', s.id)}
               active={activeStates.has(s.id)}
               outcome={highlight?.outcome}
               acceptAny={acceptsByEmptyStack(doc)}
@@ -622,6 +702,16 @@ export function Canvas({ readOnly = false }: CanvasProps) {
             />
           ))}
         </g>
+
+        {lasso && (
+          <rect
+            className="lasso-rect"
+            x={Math.min(lasso.a.x, lasso.b.x)}
+            y={Math.min(lasso.a.y, lasso.b.y)}
+            width={Math.abs(lasso.a.x - lasso.b.x)}
+            height={Math.abs(lasso.a.y - lasso.b.y)}
+          />
+        )}
       </svg>
 
       {renderInlineEditor()}
