@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions } from 'electron'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import iconIco from '../../build/icon.ico?asset'
 import iconPng from '../../build/icon.png?asset'
@@ -238,8 +238,12 @@ function registerIpcHandlers(): void {
     if (!target) return null
     // Unsichtbares Fenster nur zum Drucken – ohne JavaScript, der Inhalt ist reines HTML/SVG.
     const printer = new BrowserWindow({ show: false, webPreferences: { javascript: false } })
+    // Über eine Datei statt data:-URL – Chromium lehnt URLs über 2 MB ab (lange Simulationen)
+    const folder = await mkdtemp(join(app.getPath('temp'), 'automat-pdf-'))
     try {
-      await printer.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+      const page = join(folder, 'export.html')
+      await writeFile(page, html, 'utf-8')
+      await printer.loadFile(page)
       const pdf = await printer.webContents.printToPDF({
         // A4 hoch oder quer je Seite – das legt das HTML per @page fest
         preferCSSPageSize: true,
@@ -251,6 +255,7 @@ function registerIpcHandlers(): void {
       return target
     } finally {
       printer.destroy()
+      await rm(folder, { recursive: true, force: true })
     }
   })
 
