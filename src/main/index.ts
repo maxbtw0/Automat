@@ -8,7 +8,7 @@ import {
   type MenuItemConstructorOptions
 } from 'electron'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import iconIco from '../../build/icon.ico?asset'
 import iconPng from '../../build/icon.png?asset'
 import { IpcChannels, type FileFilter, type MenuAction, type OpenFileResult } from '../shared/ipc'
@@ -183,6 +183,12 @@ async function askSavePath(
   return result.canceled || !result.filePath ? null : result.filePath
 }
 
+/** Zuletzt begonnene Bildfolge pro Fenster (`webContents.id`) */
+const sequences = new Map<
+  number,
+  { folder: string; baseName: string; extension: string; count: number }
+>()
+
 function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.openFile, async (event): Promise<OpenFileResult | null> => {
     const win = BrowserWindow.fromWebContents(event.sender)
@@ -221,8 +227,8 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(
-    IpcChannels.exportSequence,
-    async (event, baseName: string, extension: string, files: Uint8Array[]) => {
+    IpcChannels.exportSequenceBegin,
+    async (event, baseName: string, extension: string, count: number) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       const options: Electron.OpenDialogOptions = {
         title: 'Ordner für die Bildfolge wählen',
@@ -233,16 +239,22 @@ function registerIpcHandlers(): void {
         : await dialog.showOpenDialog(options)
       if (result.canceled || result.filePaths.length === 0) return null
       const folder = result.filePaths[0]
-      const digits = String(files.length).length
-      await Promise.all(
-        files.map((data, i) => {
-          const number = String(i + 1).padStart(Math.max(2, digits), '0')
-          return safeWriteFile(join(folder, `${baseName}-${number}.${extension}`), data)
-        })
-      )
+      if (!/^[a-z]+$/.test(extension)) throw new Error('Ungültige Endung')
+      sequences.set(event.sender.id, { folder, baseName: basename(baseName), extension, count })
       return folder
     }
   )
+
+  // Ein Bild nach dem anderen – der Renderer muss nie alle gleichzeitig im Speicher halten.
+  // Den Pfad baut der Hauptprozess selbst: Der Renderer wählt nur die Nummer.
+  ipcMain.handle(IpcChannels.exportSequenceWrite, async (event, index: number, data: Uint8Array) => {
+    const sequence = sequences.get(event.sender.id)
+    if (!sequence) throw new Error('Keine Bildfolge begonnen')
+    const { folder, baseName, extension, count } = sequence
+    if (!Number.isInteger(index) || index < 0 || index >= count) throw new Error('Ungültiges Bild')
+    const number = String(index + 1).padStart(Math.max(2, String(count).length), '0')
+    await safeWriteFile(join(folder, `${baseName}-${number}.${extension}`), data)
+  })
 
   ipcMain.handle(IpcChannels.exportPdf, async (event, defaultName: string, html: string) => {
     const filter = { name: 'PDF', extensions: ['pdf'] }

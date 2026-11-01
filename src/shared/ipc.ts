@@ -9,7 +9,8 @@ export const IpcChannels = {
   openFile: 'file:open',
   saveFile: 'file:save',
   exportSave: 'export:save',
-  exportSequence: 'export:sequence',
+  exportSequenceBegin: 'export:sequence-begin',
+  exportSequenceWrite: 'export:sequence-write',
   exportPdf: 'export:pdf',
   windowDirty: 'window:dirty',
   closeRequest: 'window:close-request',
@@ -50,14 +51,12 @@ export interface AutomatApi {
   /** Export: speichert `data` über einen Speichern-Dialog. Liefert den Pfad oder `null`. */
   saveExport(defaultName: string, filter: FileFilter, data: Uint8Array): Promise<string | null>
   /**
-   * Export einer Bildfolge: fragt nach einem Ordner und schreibt `baseName-01.ext`, `-02` …
-   * Liefert den Ordner oder `null`.
+   * Export einer Bildfolge mit `count` Bildern: fragt nach einem Ordner und liefert ihn oder
+   * `null`. Die Bilder schreibt danach `writeExportSequence` einzeln als `baseName-01.ext` …
    */
-  saveExportSequence(
-    baseName: string,
-    extension: string,
-    files: Uint8Array[]
-  ): Promise<string | null>
+  beginExportSequence(baseName: string, extension: string, count: number): Promise<string | null>
+  /** Schreibt Bild Nr. `index` (ab 0) der zuletzt begonnenen Bildfolge. */
+  writeExportSequence(index: number, data: Uint8Array): Promise<void>
   /** Export als PDF: `html` wird unsichtbar gerendert und gedruckt. Liefert den Pfad oder `null`. */
   exportPdf(defaultName: string, html: string): Promise<string | null>
   /** Meldet ungespeicherte Änderungen – nur dann fragt das Fenster beim Schließen nach. */

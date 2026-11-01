@@ -6,8 +6,10 @@ const api: AutomatApi = {
   saveFile: (content, filePath) => ipcRenderer.invoke(IpcChannels.saveFile, content, filePath),
   saveExport: (defaultName, filter, data) =>
     ipcRenderer.invoke(IpcChannels.exportSave, defaultName, filter, data),
-  saveExportSequence: (baseName, extension, files) =>
-    ipcRenderer.invoke(IpcChannels.exportSequence, baseName, extension, files),
+  beginExportSequence: (baseName, extension, count) =>
+    ipcRenderer.invoke(IpcChannels.exportSequenceBegin, baseName, extension, count),
+  writeExportSequence: (index, data) =>
+    ipcRenderer.invoke(IpcChannels.exportSequenceWrite, index, data),
   exportPdf: (defaultName, html) => ipcRenderer.invoke(IpcChannels.exportPdf, defaultName, html),
   setDirty: (dirty) => ipcRenderer.send(IpcChannels.windowDirty, dirty),
   onCloseRequest: (callback) => {

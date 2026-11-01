@@ -413,19 +413,23 @@ function download(fileName: string, data: Uint8Array): void {
   URL.revokeObjectURL(url)
 }
 
+/** So viele Bilder werden gleichzeitig gerastert – jedes belegt unkomprimiert viel Speicher. */
+const RASTER_PARALLEL = 2
+
 /**
  * Führt den Export aus. Liefert den Speicherort oder `null`, wenn der Nutzer abbricht.
  * Bildfolgen (mehrere Bilder als PNG/JPG) landen als nummerierte Dateien in einem Ordner,
- * als PDF bekommt jedes Bild eine eigene Seite.
+ * als PDF bekommt jedes Bild eine eigene Seite. `plan` = schon berechneter Plan (Vorschau).
  */
 export async function runExport(
   content: ExportContent,
   format: ExportFormat,
   theme: ExportTheme,
-  options: ExportOptions = {}
+  options: ExportOptions = {},
+  plan: ExportPlan = planExport(content, format, theme, options)
 ): Promise<string | null> {
   const { filePath } = useEditorStore.getState()
-  const { table, pages } = planExport(content, format, theme, options)
+  const { table, pages } = plan
   const base = `${displayName(filePath)}-${FILE_SUFFIX[content]}`
 
   if (format === 'csv') {
@@ -441,11 +445,37 @@ export async function runExport(
   }
 
   const type = format === 'jpg' ? 'jpeg' : 'png'
-  const files = await Promise.all(pages.map((image) => rasterize(image, type)))
-  if (files.length === 1) return save(`${base}.${format}`, format, files[0])
-  if (window.api) return window.api.saveExportSequence(base, format, files)
-  files.forEach((data, i) => download(`${base}-${String(i + 1).padStart(2, '0')}.${format}`, data))
+  if (pages.length === 1) return save(`${base}.${format}`, format, await rasterize(pages[0], type))
+  // Erst den Ordner wählen, dann Bild für Bild rastern und sofort schreiben
+  const api = window.api
+  if (api) {
+    const folder = await api.beginExportSequence(base, format, pages.length)
+    if (!folder) return null
+    await forEachLimited(pages, RASTER_PARALLEL, async (image, i) =>
+      api.writeExportSequence(i, await rasterize(image, type))
+    )
+    return folder
+  }
+  await forEachLimited(pages, RASTER_PARALLEL, async (image, i) =>
+    download(`${base}-${String(i + 1).padStart(2, '0')}.${format}`, await rasterize(image, type))
+  )
   return base
+}
+
+/** Führt `task` für alle Einträge aus, höchstens `limit` gleichzeitig. */
+async function forEachLimited<T>(
+  items: T[],
+  limit: number,
+  task: (item: T, index: number) => Promise<void>
+): Promise<void> {
+  let next = 0
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++
+      await task(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }
 
 /** Browser-Modus (Entwicklung): Druckdialog mit „Als PDF speichern“. */

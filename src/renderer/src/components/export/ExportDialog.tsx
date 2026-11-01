@@ -149,7 +149,9 @@ export function ExportDialog() {
     setError(null)
     setDone(false)
     try {
-      const result = await runExport(content, format, theme, { description })
+      // Den Plan der Vorschau weiterverwenden – nicht alles ein zweites Mal berechnen
+      const ready = plan?.ok ? plan.value : undefined
+      const result = await runExport(content, format, theme, { description }, ready)
       // Fenster bleibt offen – kurze Bestätigung auf dem Knopf
       if (result !== null) {
         setDone(true)

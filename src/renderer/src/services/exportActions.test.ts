@@ -1,11 +1,24 @@
 import { DEFAULT_SIMULATION } from '@shared/simulationSettings'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AutomatApi } from '@shared/ipc'
 import { setSimulationLimits } from '@/core/automaton/limits'
 import { buildDocument } from '@/core/automaton/testing'
 import { A4 } from '@/export/svg'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
-import { FORMATS, defaultExportArea, planExport } from './exportActions'
+import { FORMATS, defaultExportArea, planExport, runExport } from './exportActions'
+
+/** Rastern braucht einen echten Browser – hier zählt nur, wie viele gleichzeitig laufen */
+const raster = vi.hoisted(() => ({ running: 0, most: 0 }))
+vi.mock('@/export/render', async (original) => ({
+  ...(await original<typeof import('@/export/render')>()),
+  rasterize: async () => {
+    raster.most = Math.max(raster.most, ++raster.running)
+    await new Promise((resolve) => setTimeout(resolve, 1))
+    raster.running--
+    return new Uint8Array([1])
+  }
+}))
 
 /** Gerade Anzahl a */
 const evenAs = buildDocument('DFA', ['a', 'b'], { start: 'q0', finals: ['q0'] }, [
@@ -98,6 +111,42 @@ describe('Simulation exportieren', () => {
   it('meldet, warum es nicht geht', () => {
     useEditorStore.getState().updateState('q0', { isStart: false })
     expect(() => planExport('simulationTable', 'csv', 'light')).toThrow('Kein Startzustand')
+  })
+})
+
+describe('Bildfolge exportieren', () => {
+  const events: string[] = []
+  const api = {
+    beginExportSequence: vi.fn<AutomatApi['beginExportSequence']>(async () => {
+      events.push('Ordner')
+      return '/bilder'
+    }),
+    writeExportSequence: vi.fn<AutomatApi['writeExportSequence']>(async (index) => {
+      events.push(`Bild ${index}`)
+    })
+  }
+
+  beforeEach(() => {
+    events.length = 0
+    raster.most = 0
+    vi.stubGlobal('window', { api })
+    useScreenStore.setState({ simulationWord: 'ab'.repeat(10) })
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('fragt zuerst nach dem Ordner und rastert höchstens zwei Bilder gleichzeitig', async () => {
+    expect(await runExport('simulationGraph', 'png', 'light')).toBe('/bilder')
+    expect(events[0]).toBe('Ordner')
+    expect(events).toHaveLength(22)
+    expect(new Set(events.slice(1)).size).toBe(21)
+    expect(raster.most).toBe(2)
+  })
+
+  it('rastert nichts, wenn die Ordnerwahl abgebrochen wird', async () => {
+    api.beginExportSequence.mockResolvedValueOnce(null)
+    expect(await runExport('simulationGraph', 'png', 'light')).toBeNull()
+    expect(raster.most).toBe(0)
   })
 })
 
