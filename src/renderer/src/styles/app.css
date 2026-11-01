@@ -1176,7 +1176,7 @@ h4 {
 .canvas.is-read-only {
   cursor: grab;
 }
-.canvas.is-space-pan {
+.canvas.is-pan-key {
   cursor: grab;
 }
 .canvas.is-panning {

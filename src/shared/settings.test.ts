@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_NEW_AUTOMATON, newAutomatonProblems, normalizeNewAutomaton } from './newAutomaton'
 import { defaultSettings, newAutomatonAlphabet, normalizeSettings, settingsValid } from './settings'
 import { DEFAULT_SIMULATION, normalizeSimulation, parseLimit } from './simulationSettings'
+import {
+  DEFAULT_NAVIGATION,
+  isPanKey,
+  normalizeNavigation,
+  panModifierHeld
+} from './navigationSettings'
 
 describe('Einstellungen – neuer Automat', () => {
   it('fehlende Vorgaben werden zum Standard', () => {
@@ -87,5 +93,31 @@ describe('Einstellungen – Simulation', () => {
     expect(parseLimit('-3')).toBeNull()
     expect(parseLimit('1,5')).toBeNull()
     expect(parseLimit('')).toBeNull()
+  })
+})
+
+describe('Einstellungen – Ansicht verschieben', () => {
+  it('Standard: Strg und mittlere Maustaste, auch wenn der Eintrag in der Datei fehlt', () => {
+    expect(normalizeSettings({}).navigation).toEqual({ panKey: 'Ctrl', panMiddleMouse: true })
+  })
+
+  it('übernimmt gültige Felder und verwirft ungültige einzeln', () => {
+    expect(normalizeNavigation({ panKey: 'Space', panMiddleMouse: false })).toEqual({
+      panKey: 'Space',
+      panMiddleMouse: false
+    })
+    expect(normalizeNavigation({ panKey: 'Shift', panMiddleMouse: 'ja' })).toEqual(
+      DEFAULT_NAVIGATION
+    )
+  })
+
+  it('erkennt die Taste im Tastatur- und im Mausereignis', () => {
+    const mouse = { ctrlKey: false, altKey: true, metaKey: false }
+    expect(panModifierHeld('Alt', mouse)).toBe(true)
+    expect(panModifierHeld('Ctrl', mouse)).toBe(false)
+    expect(panModifierHeld('Space', { ...mouse, ctrlKey: true })).toBe(false)
+    expect(isPanKey('Ctrl', { key: 'Control', code: 'ControlLeft' })).toBe(true)
+    expect(isPanKey('Space', { key: ' ', code: 'Space' })).toBe(true)
+    expect(isPanKey('none', { key: ' ', code: 'Space' })).toBe(false)
   })
 })

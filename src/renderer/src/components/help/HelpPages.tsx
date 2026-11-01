@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { KEY_ACTION_IDS, KEY_ACTIONS, formatCombo, type KeyAction } from '@shared/keybindings'
+import { PAN_KEY_LABELS } from '@shared/navigationSettings'
 import type { AutomatonType } from '@/model/graph'
 import { useSettingsStore } from '@/store/settingsStore'
 import { EXAMPLE_FILE } from './helpExample'
@@ -529,6 +530,15 @@ function keyGroups(): { group: string; actions: KeyAction[] }[] {
 }
 
 function TooltipsPage() {
+  const { panKey, panMiddleMouse } = useSettingsStore((s) => s.settings.navigation)
+  const panRows: [ReactNode, ReactNode][] = []
+  if (panKey !== 'none') {
+    panRows.push([
+      <kbd key="p">{PAN_KEY_LABELS[panKey]}</kbd>,
+      'gedrückt halten und ziehen: Ansicht verschieben'
+    ])
+  }
+  if (panMiddleMouse) panRows.push(['Mittlere Maustaste ziehen', 'Ansicht verschieben'])
   return (
     <>
       {keyGroups().map(({ group, actions }) => (
@@ -543,12 +553,7 @@ function TooltipsPage() {
           rows={[
             ['Mausrad', 'zoomen'],
             ['Ziehen auf freier Fläche', 'Rechteck aufziehen: mehrere Elemente auswählen'],
-            [
-              <span key="s">
-                <kbd>Strg</kbd> oder <kbd>Leertaste</kbd>
-              </span>,
-              'gedrückt halten und ziehen: Ansicht verschieben (auch mittlere Maustaste)'
-            ],
+            ...panRows,
             ['Doppelklick auf freie Fläche', 'neuer Zustand'],
             ['Doppelklick auf Zustand', 'umbenennen'],
             ['Doppelklick auf Übergang', 'Beschriftung bearbeiten'],

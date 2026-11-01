@@ -9,9 +9,18 @@ import {
   type KeyAction,
   type Keybindings
 } from '@shared/keybindings'
+import {
+  DEFAULT_NAVIGATION,
+  PAN_KEYS,
+  PAN_KEY_LABELS,
+  sameNavigation,
+  type NavigationSettings,
+  type PanKey
+} from '@shared/navigationSettings'
 import { Icon } from '@/components/common/Icon'
 import { askChoice } from '@/store/dialogStore'
 import { classNames } from '@/utils/dom'
+import { SettingsSegmented } from './SettingsFields'
 
 /** Gerade aufgenommenes Kürzel: ersetzt das an Position `index` oder kommt neu dazu (`null`). */
 interface Recording {
@@ -31,15 +40,20 @@ function isDefault(action: KeyAction, combos: string[]): boolean {
 
 /**
  * Tastenkürzel: pro Aktion beliebig viele Kombinationen. Klick auf ein Kürzel oder „+“ nimmt
- * den nächsten Tastendruck auf, Esc oder Klick daneben bricht ab. Bearbeitet wird ein Entwurf –
- * gespeichert wird erst im Einstellungen-Fenster.
+ * den nächsten Tastendruck auf, Esc oder Klick daneben bricht ab. Dazu die Taste, die man zum
+ * Verschieben der Ansicht gedrückt hält. Bearbeitet wird ein Entwurf – gespeichert wird erst im
+ * Einstellungen-Fenster.
  */
 export function KeybindingsTab({
   bindings,
-  onChange
+  navigation,
+  onChange,
+  onNavigationChange
 }: {
   bindings: Keybindings
+  navigation: NavigationSettings
   onChange(bindings: Keybindings): void
+  onNavigationChange(navigation: NavigationSettings): void
 }) {
   const setKeybinding = (action: KeyAction, combos: string[]): void =>
     onChange({ ...bindings, [action]: combos })
@@ -94,9 +108,12 @@ export function KeybindingsTab({
     if (choice !== 0) return
     setError(null)
     onChange(defaultKeybindings())
+    onNavigationChange({ ...DEFAULT_NAVIGATION })
   }
 
-  const allDefault = KEY_ACTION_IDS.every((id) => isDefault(id, bindings[id]))
+  const allDefault =
+    KEY_ACTION_IDS.every((id) => isDefault(id, bindings[id])) &&
+    sameNavigation(navigation, DEFAULT_NAVIGATION)
   const isRecording = (action: KeyAction, index: number | null): boolean =>
     recording?.action === action && recording.index === index
 
@@ -172,8 +189,64 @@ export function KeybindingsTab({
               {error?.action === action && <p className="keybinding-error">{error.text}</p>}
             </div>
           ))}
+          {group === 'Grapheneditor' && (
+            <NavigationRows value={navigation} onChange={onNavigationChange} />
+          )}
         </section>
       ))}
     </div>
+  )
+}
+
+/** Ansicht verschieben: Taste gedrückt halten und ziehen, mittlere Maustaste */
+function NavigationRows({
+  value,
+  onChange
+}: {
+  value: NavigationSettings
+  onChange(value: NavigationSettings): void
+}) {
+  const reset = (field: keyof NavigationSettings) => (
+    <button
+      className={classNames(
+        'btn is-ghost is-icon keybinding-reset',
+        value[field] === DEFAULT_NAVIGATION[field] && 'is-hidden'
+      )}
+      title="Standard"
+      aria-label="Standard"
+      onClick={() => onChange({ ...value, [field]: DEFAULT_NAVIGATION[field] })}
+    >
+      <Icon name="reset" size={14} />
+    </button>
+  )
+  return (
+    <>
+      <div className="keybinding-row">
+        <span className="keybinding-label">Ansicht verschieben</span>
+        <div className="keybinding-keys">
+          <SettingsSegmented<PanKey>
+            label="Ansicht verschieben"
+            options={PAN_KEYS.map((key) => ({ value: key, label: PAN_KEY_LABELS[key] }))}
+            value={value.panKey}
+            onChange={(panKey) => onChange({ ...value, panKey })}
+          />
+        </div>
+        {reset('panKey')}
+      </div>
+      <div className="keybinding-row">
+        <span className="keybinding-label">Mittlere Maustaste</span>
+        <div className="keybinding-keys">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={value.panMiddleMouse}
+              onChange={(e) => onChange({ ...value, panMiddleMouse: e.target.checked })}
+            />
+            Ansicht verschieben
+          </label>
+        </div>
+        {reset('panMiddleMouse')}
+      </div>
+    </>
   )
 }

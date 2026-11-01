@@ -19,6 +19,7 @@ import {
   toggleSelected,
   useEditorStore
 } from '@/store/editorStore'
+import { useSettingsStore } from '@/store/settingsStore'
 import { classNames, isEditableTarget } from '@/utils/dom'
 import {
   clamp,
@@ -32,6 +33,7 @@ import {
   type EdgeGeometry,
   type Point
 } from '@/utils/geometry'
+import { isPanKey, panModifierHeld } from '@shared/navigationSettings'
 import { ContextMenu, type ContextMenuEntry } from '@/components/common/ContextMenu'
 import { formatLabelsInline, parseLabels } from '@/core/automaton/labels'
 import { InlineEditor } from './InlineEditor'
@@ -66,8 +68,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const highlight = useEditorStore((s) => s.highlight)
   const inlineEdit = useEditorStore((s) => s.inlineEdit)
 
-  const [spacePressed, setSpacePressed] = useState(false)
-  const [ctrlPressed, setCtrlPressed] = useState(false)
+  const { panKey, panMiddleMouse } = useSettingsStore((s) => s.settings.navigation)
+  /** Verschiebe-Taste gedrückt (aus keydown/keyup – die Leertaste steht in keinem Mausereignis) */
+  const [panKeyDown, setPanKeyDown] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
   const [connectPreview, setConnectPreview] = useState<{ fromId: StateId; pointer: Point } | null>(
     null
@@ -197,27 +200,24 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     }
   }, [])
 
-  // ---------- Leertaste / Strg = Ansicht verschieben ----------
+  // ---------- Verschiebe-Taste (Einstellungen, Standard Strg) ----------
 
   useEffect(() => {
-    // Im Nur-Lesen-Modus verschiebt schon das normale Ziehen – die Leertaste bleibt frei.
+    // Im Nur-Lesen-Modus verschiebt schon das normale Ziehen – die Taste bleibt frei.
     if (readOnly) return
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Control') setCtrlPressed(true)
-      if (e.code === 'Space' && !isEditableTarget(e.target)) {
-        e.preventDefault()
-        setSpacePressed(true)
-      }
+      if (!isPanKey(panKey, e) || isEditableTarget(e.target)) return
+      // Leertaste scrollt sonst, Alt öffnet das Menü
+      if (panKey !== 'Ctrl') e.preventDefault()
+      setPanKeyDown(true)
     }
     const onKeyUp = (e: KeyboardEvent): void => {
-      if (e.key === 'Control') setCtrlPressed(false)
-      if (e.code === 'Space') setSpacePressed(false)
+      if (!isPanKey(panKey, e)) return
+      if (panKey === 'Alt') e.preventDefault()
+      setPanKeyDown(false)
     }
     // Fensterwechsel mit gedrückter Taste: das keyup kommt nie an
-    const onBlur = (): void => {
-      setCtrlPressed(false)
-      setSpacePressed(false)
-    }
+    const onBlur = (): void => setPanKeyDown(false)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onBlur)
@@ -225,8 +225,12 @@ export function Canvas({ readOnly = false }: CanvasProps) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
+      setPanKeyDown(false)
     }
-  }, [readOnly])
+  }, [readOnly, panKey])
+
+  const panHeld = (e: { ctrlKey: boolean; altKey: boolean; metaKey: boolean }): boolean =>
+    panKeyDown || panModifierHeld(panKey, e)
 
   // ---------- Zieh-Interaktionen (auf window, damit sie auch außerhalb des Canvas weiterlaufen) ----------
 
@@ -388,7 +392,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
 
   const handleBackgroundPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
     setContextMenu(null)
-    if (e.button === 1 || (e.button === 0 && (spacePressed || e.ctrlKey))) {
+    if ((e.button === 1 && panMiddleMouse) || (e.button === 0 && panHeld(e))) {
       e.preventDefault()
       startPan(e)
       return
@@ -439,8 +443,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   // ---------- Zustände ----------
 
   const handleStatePointerDown = (e: PointerEvent<SVGGElement>, state: StateNode): void => {
-    // Mittelklick/Leertaste/Strg an den Hintergrund durchreichen → Ansicht verschieben
-    if (readOnly || e.button !== 0 || spacePressed || e.ctrlKey) return
+    // Mittelklick/Verschiebe-Taste an den Hintergrund durchreichen → Ansicht verschieben
+    if (readOnly || e.button !== 0 || panHeld(e)) return
     e.stopPropagation()
     setContextMenu(null)
 
@@ -491,7 +495,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   // ---------- Übergänge ----------
 
   const handleTransitionPointerDown = (e: PointerEvent<SVGGElement>, t: TransitionEdge): void => {
-    if (readOnly || e.button !== 0 || spacePressed || e.ctrlKey) return
+    if (readOnly || e.button !== 0 || panHeld(e)) return
     e.stopPropagation()
     setContextMenu(null)
     const store = useEditorStore.getState()
@@ -643,7 +647,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         className={classNames(
           'canvas',
           readOnly ? 'is-read-only' : `tool-${tool}`,
-          (spacePressed || ctrlPressed) && 'is-space-pan',
+          panKeyDown && 'is-pan-key',
           isPanning && 'is-panning'
         )}
         onPointerDown={handleBackgroundPointerDown}

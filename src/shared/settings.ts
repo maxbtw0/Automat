@@ -13,6 +13,11 @@ import {
   type NewAutomatonSettings
 } from './newAutomaton'
 import {
+  DEFAULT_NAVIGATION,
+  normalizeNavigation,
+  type NavigationSettings
+} from './navigationSettings'
+import {
   DEFAULT_SIMULATION,
   normalizeSimulation,
   type SimulationSettings
@@ -27,6 +32,8 @@ export interface Settings {
   alphabetPresets: AlphabetPreset[]
   newAutomaton: NewAutomatonSettings
   simulation: SimulationSettings
+  /** Grapheneditor: Ansicht verschieben */
+  navigation: NavigationSettings
 }
 
 /** Bei Strukturänderungen erhöhen und in `normalizeSettings` migrieren. */
@@ -37,7 +44,8 @@ export function defaultSettings(): Settings {
     keybindings: defaultKeybindings(),
     alphabetPresets: defaultAlphabetPresets(),
     newAutomaton: { ...DEFAULT_NEW_AUTOMATON },
-    simulation: { ...DEFAULT_SIMULATION }
+    simulation: { ...DEFAULT_SIMULATION },
+    navigation: { ...DEFAULT_NAVIGATION }
   }
 }
 
@@ -48,7 +56,8 @@ export function normalizeSettings(raw: unknown): Settings {
     keybindings: normalizeKeybindings(record['keybindings']),
     alphabetPresets: normalizeAlphabetPresets(record['alphabetPresets']),
     newAutomaton: normalizeNewAutomaton(record['newAutomaton']),
-    simulation: normalizeSimulation(record['simulation'])
+    simulation: normalizeSimulation(record['simulation']),
+    navigation: normalizeNavigation(record['navigation'])
   }
 }
 

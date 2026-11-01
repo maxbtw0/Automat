@@ -91,7 +91,9 @@ function SettingsWindow() {
             {tab === 'keybindings' && (
               <KeybindingsTab
                 bindings={draft.keybindings}
+                navigation={draft.navigation}
                 onChange={(keybindings) => setDraft({ ...draft, keybindings })}
+                onNavigationChange={(navigation) => setDraft({ ...draft, navigation })}
               />
             )}
             {tab === 'newAutomaton' && (

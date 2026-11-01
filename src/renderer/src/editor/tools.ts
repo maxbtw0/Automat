@@ -18,7 +18,7 @@ export const TOOLS: ToolDefinition[] = [
     label: 'Auswählen',
     icon: 'select',
     keyAction: 'tool.select',
-    hint: 'Klicken: auswählen · Ziehen: verschieben · Ziehen auf Fläche: Rechteck auswählen · Doppelklick auf Fläche: neuer Zustand · Strg/Leertaste/Mittelklick + Ziehen: Ansicht verschieben'
+    hint: 'Klicken: auswählen · Ziehen: verschieben · Ziehen auf Fläche: Rechteck auswählen · Doppelklick auf Fläche: neuer Zustand · Strg/Mittelklick + Ziehen: Ansicht verschieben'
   },
   {
     id: 'lasso',
