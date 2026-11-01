@@ -114,4 +114,14 @@ describe('DFA – Alphabet', () => {
     const errors = new DFA(doc).validate().filter((i) => i.severity === 'error')
     expect(errors.map((i) => i.message)).toContain('„a“ einzeln und in „ab“')
   })
+
+  it('meldet Symbole mit Leerzeichen, Komma oder Semikolon (z. B. aus einer Datei)', () => {
+    const doc = buildDocument('DFA', [' ', ',', 'a;b', 'c'], { start: 'q0' }, [])
+    const errors = new DFA(doc).validate().filter((i) => i.severity === 'error')
+    expect(errors.map((i) => i.message)).toEqual([
+      '„ “ mit Leerzeichen, Komma oder Semikolon',
+      '„,“ mit Leerzeichen, Komma oder Semikolon',
+      '„a;b“ mit Leerzeichen, Komma oder Semikolon'
+    ])
+  })
 })

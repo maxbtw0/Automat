@@ -6,7 +6,7 @@
  */
 
 import type { AutomatonType, StackAcceptance, TapeMove } from '@shared/automatonTypes'
-import { overlapProblem } from '@shared/alphabetRules'
+import { SYMBOL_SEPARATOR, overlapProblem } from '@shared/alphabetRules'
 import { DEFAULT_NEW_AUTOMATON, type NewAutomatonSettings } from '@shared/newAutomaton'
 
 export { AUTOMATON_TYPES, TAPE_MOVES } from '@shared/automatonTypes'
@@ -340,7 +340,9 @@ export function validateSymbol(alphabet: string[], symbol: string, previous?: st
     return 'ε ist das leere Wort und kein Symbol des Alphabets.'
   }
   // Diese Zeichen trennen Symbole in parseSymbols – im Symbol selbst wären sie mehrdeutig.
-  if (/[,;\s]/.test(symbol)) return 'Ein Symbol darf kein Leerzeichen, Komma oder Semikolon enthalten.'
+  if (SYMBOL_SEPARATOR.test(symbol)) {
+    return 'Ein Symbol darf kein Leerzeichen, Komma oder Semikolon enthalten.'
+  }
   if (symbol !== previous && alphabet.includes(symbol)) return `„${symbol}“ doppelt`
   return overlapProblem(
     alphabet.filter((s) => s !== previous),

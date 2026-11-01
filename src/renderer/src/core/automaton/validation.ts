@@ -1,4 +1,4 @@
-import { alphabetOverlap } from '@shared/alphabetRules'
+import { alphabetOverlap, separatorProblem } from '@shared/alphabetRules'
 import {
   EPSILON,
   edgeSymbols,
@@ -55,8 +55,9 @@ export function checkReferences(graph: EditorGraph): ValidationIssue[] {
 }
 
 /**
- * Kein Zeichen einzeln und zugleich in einem Mehrzeichen-Symbol (`overlapProblem`) – in Σ und,
- * falls vorhanden, im Stack-, Band- und Ausgabealphabet.
+ * Kein Zeichen einzeln und zugleich in einem Mehrzeichen-Symbol (`overlapProblem`) und kein
+ * Trennzeichen im Symbol (`separatorProblem`) – in Σ und, falls vorhanden, im Stack-, Band- und
+ * Ausgabealphabet. Der Alphabeteditor lässt das nicht zu, Dateien und Ausdrücke kommen von außen.
  */
 export function checkAlphabets(document: AutomatonDocument): ValidationIssue[] {
   const alphabets = [
@@ -67,7 +68,12 @@ export function checkAlphabets(document: AutomatonDocument): ValidationIssue[] {
   ]
   const messages = new Set<string>()
   for (const alphabet of alphabets) {
-    const problem = alphabet && alphabetOverlap(alphabet)
+    if (!alphabet) continue
+    for (const symbol of alphabet) {
+      const problem = separatorProblem(symbol)
+      if (problem) messages.add(problem)
+    }
+    const problem = alphabetOverlap(alphabet)
     if (problem) messages.add(problem)
   }
   return [...messages].map((message) => ({ severity: 'error', message }))

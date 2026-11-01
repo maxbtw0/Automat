@@ -130,6 +130,12 @@ describe('Symbole mit Operator-Zeichen', () => {
     expect(() => parseRegex('a\\ε')).toThrow('ε ist kein Symbol')
   })
 
+  it('Leerzeichen, Komma und Semikolon sind keine Symbole – auch nicht maskiert', () => {
+    for (const input of ['\\ ', 'a\\\t', ',', 'a;b', '\\,']) {
+      expect(() => parseRegex(input), input).toThrow('keine Symbole')
+    }
+  })
+
   it('liest Zeichen außerhalb der Basisebene als ein Symbol (Emoji)', () => {
     expect(parseRegex('😀*')).toEqual(star(symbol('😀')))
     expect(parseRegex('a😀')).toEqual(concat(symbol('a'), symbol('😀')))

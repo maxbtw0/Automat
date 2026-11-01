@@ -1,3 +1,4 @@
+import { SYMBOL_SEPARATOR } from '@shared/alphabetRules'
 import { EPSILON } from '@/model/graph'
 
 /**
@@ -210,6 +211,8 @@ export function regexSymbols(regex: Regex): Set<string> {
 
 // --- Parser ------------------------------------------------------------------------
 
+const SEPARATOR_MESSAGE = 'Leerzeichen, Komma und Semikolon sind keine Symbole'
+
 export class RegexSyntaxError extends Error {
   constructor(
     message: string,
@@ -309,10 +312,13 @@ export function parseRegex(input: string, alphabet: string[] = []): Regex {
       const text = String.fromCodePoint(escaped)
       // ε liegt nie in Σ – als Symbol würde es im NEA zum ε-Übergang
       if (text === EPSILON) fail(`„${ESCAPE}${EPSILON}“: ε ist kein Symbol`)
+      // Wie im Alphabeteditor: Trennzeichen ließen sich weder eingeben noch beschriften
+      if (SYMBOL_SEPARATOR.test(text)) fail(SEPARATOR_MESSAGE)
       pos += 1 + text.length
       return symbol(text)
     }
     if (SPECIAL.has(c)) fail(`Unerwartetes Zeichen „${c}“`)
+    if (SYMBOL_SEPARATOR.test(c)) fail(SEPARATOR_MESSAGE)
     // Ganzes Zeichen, nicht nur eine UTF-16-Hälfte – sonst bindet „😀*“ den Stern falsch
     const text = String.fromCodePoint(input.codePointAt(pos) as number)
     pos += text.length

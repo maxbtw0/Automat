@@ -1,4 +1,17 @@
 /**
+ * Leerraum, Komma und Semikolon trennen Symbole (Alphabet-Eingabe, Beschriftungen, Wörter) –
+ * in einem Symbol wären sie mehrdeutig.
+ */
+export const SYMBOL_SEPARATOR = /[,;\s]/
+
+/** Problem eines Symbols mit Trennzeichen: „„a b“ mit Leerzeichen, Komma oder Semikolon“ */
+export function separatorProblem(symbol: string): string | null {
+  return SYMBOL_SEPARATOR.test(symbol)
+    ? `„${symbol}“ mit Leerzeichen, Komma oder Semikolon`
+    : null
+}
+
+/**
  * Ein Zeichen darf nicht einzeln im Alphabet liegen und zugleich in einem Symbol mit mehreren
  * Zeichen vorkommen. Sonst ist ein Wort mehrdeutig: Bei Σ = {a, b, ab} kann „ab“ das eine
  * Symbol ab oder die Folge a, b sein.
