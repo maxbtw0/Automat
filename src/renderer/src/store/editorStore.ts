@@ -323,6 +323,22 @@ const mapLabels = (
     })
   })
 
+/** Entfernt Übergänge, die in `before` noch Regeln hatten und in `after` keine mehr. */
+const withoutEmptiedTransitions = (
+  before: AutomatonDocument,
+  after: AutomatonDocument
+): AutomatonDocument => {
+  const hadLabels = new Set(
+    before.graph.transitions.filter((t) => t.labels.length > 0).map((t) => t.id)
+  )
+  const transitions = after.graph.transitions.filter(
+    (t) => t.labels.length > 0 || !hadLabels.has(t.id)
+  )
+  return transitions.length === after.graph.transitions.length
+    ? after
+    : withGraph(after, { transitions })
+}
+
 function validSelection(doc: AutomatonDocument, selection: Selection): Selection {
   if (!selection) return null
   if (selection.kind === 'group') {
@@ -475,7 +491,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           }
         }
       }),
-    deleteSymbol: (index, kind = 'input') =>
+    deleteSymbol: (index, kind = 'input') => {
       commit((doc) => {
         const alphabet = alphabetOf(doc, kind)
         const symbol = alphabet[index]
@@ -488,13 +504,18 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           const without = mapOutputs(doc, (word) => word.filter((s) => s !== symbol))
           return withAlphabet(without, kind, alphabet.filter((_, i) => i !== index))
         }
-        const without = mapLabels(doc, (l) => (labelSymbols(l, kind).includes(symbol) ? null : l))
+        const without = withoutEmptiedTransitions(
+          doc,
+          mapLabels(doc, (l) => (labelSymbols(l, kind).includes(symbol) ? null : l))
+        )
         const result = withAlphabet(without, kind, alphabet.filter((_, i) => i !== index))
         if (kind === 'stack' && result.stack?.start === symbol) {
           return { ...result, stack: { ...result.stack, start: null } }
         }
         return result
-      }),
+      })
+      set((s) => ({ selection: validSelection(s.document, s.selection) }))
+    },
     sortAlphabet: (kind = 'input') =>
       commit((doc) => {
         const current = alphabetOf(doc, kind)

@@ -153,6 +153,25 @@ describe('deleteSymbol', () => {
     expect(transitionSymbols(transitionId)).toEqual(['b'])
   })
 
+  it('entfernt Übergänge, die danach keine Regel mehr haben', () => {
+    const { transitionId } = setupAB()
+    store().select({ kind: 'transition', id: transitionId })
+    store().deleteSymbol(0)
+    store().deleteSymbol(0)
+
+    expect(store().document.graph.transitions).toEqual([])
+    expect(store().selection).toBeNull()
+  })
+
+  it('lässt Übergänge stehen, die schon vorher leer waren', () => {
+    setupAB()
+    const [from, to] = store().document.graph.states.map((s) => s.id)
+    const empty = store().addTransition(to, from)
+    store().deleteSymbol(0)
+
+    expect(store().document.graph.transitions.map((t) => t.id)).toContain(empty)
+  })
+
   it('ändert bei ungültigem Index nichts und legt keinen Verlaufseintrag an', () => {
     setupAB()
     const before = store().document
@@ -264,12 +283,12 @@ describe('Stackalphabet Γ', () => {
     expect(store().document.alphabet).toEqual(['a'])
   })
 
-  it('löscht ein Stacksymbol samt Regeln, die es benutzen', () => {
+  it('löscht ein Stacksymbol samt Regeln, die es benutzen, und leere Übergänge', () => {
     const { transitionId } = setupStack()
     store().deleteSymbol(1, 'stack')
 
     expect(store().document.stack?.alphabet).toEqual(['#'])
-    expect(labels(transitionId)).toEqual([])
+    expect(labels(transitionId)).toBeUndefined()
   })
 
   it('löscht das Startsymbol → Stack startet leer', () => {
