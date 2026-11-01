@@ -29,11 +29,26 @@ export const symbol = (s: string): Regex => ({ kind: 'symbol', symbol: s })
 // --- Konstruktoren, die gleich vereinfachen ---------------------------------------
 // So bleibt das Ergebnis der Zustandselimination lesbar (z. B. ε·a = a, ∅|r = r).
 
+/** Aufbau eines zusammengesetzten Ausdrucks (Schlüssel der Teile) → kurzer Schlüssel „#n“ */
+const structureKeys = new Map<string, string>()
+let nextStructure = 0
+/** Schlüssel pro Knoten – Teilausdrücke werden geteilt, jeder wird nur einmal berechnet */
+const nodeKeys = new WeakMap<Regex, string>()
+
 /**
  * Eindeutiger Schlüssel für den Aufbau eines Ausdrucks: gleicher Baum ↔ gleicher Schlüssel.
  * Nicht die Ausgabe von `formatRegex` – dort sehen das Symbol „ab“ und die Folge a·b gleich aus.
+ *
+ * Zusammengesetzte Ausdrücke bekommen eine laufende Nummer statt ihres ganzen Aufbaus als Text:
+ * Die Zustandselimination verwendet Teilausdrücke vielfach wieder, ausgeschrieben würden die
+ * Schlüssel exponentiell lang. Die Nummern wachsen nur, darum darf die Tabelle geleert werden –
+ * danach bekommt ein gleicher Aufbau höchstens eine neue Nummer (es fällt dann eine
+ * Vereinfachung weg), zwei verschiedene nie dieselbe.
  */
 export function regexKey(regex: Regex): string {
+  const cached = nodeKeys.get(regex)
+  if (cached !== undefined) return cached
+  let key: string
   switch (regex.kind) {
     case 'empty':
     case 'epsilon':
@@ -42,10 +57,56 @@ export function regexKey(regex: Regex): string {
       return JSON.stringify(regex.symbol)
     case 'union':
     case 'concat':
-      return `${regex.kind}(${regex.parts.map(regexKey).join(',')})`
+      key = structureKey(`${regex.kind}(${regex.parts.map(regexKey).join(',')})`)
+      break
     case 'star':
-      return `star(${regexKey(regex.inner)})`
+      key = structureKey(`star(${regexKey(regex.inner)})`)
+      break
   }
+  nodeKeys.set(regex, key)
+  return key
+}
+
+function structureKey(structure: string): string {
+  const known = structureKeys.get(structure)
+  if (known !== undefined) return known
+  if (structureKeys.size >= 100_000) structureKeys.clear()
+  const key = `#${nextStructure++}`
+  structureKeys.set(structure, key)
+  return key
+}
+
+const lengths = new WeakMap<Regex, number>()
+
+/**
+ * Länge von `formatRegex(regex)` in UTF-16-Einheiten, ohne den Ausdruck auszuschreiben (jeder
+ * geteilte Teilausdruck wird einmal gezählt und gemerkt). Zählt in jeder Verkettung die
+ * Leerzeichen mit, die nur bei Mehrzeichen-Symbolen nötig sind – ist also höchstens zu groß.
+ */
+export function regexLength(regex: Regex): number {
+  const cached = lengths.get(regex)
+  if (cached !== undefined) return cached
+  const inner = (p: Regex, minPrecedence: number): number =>
+    regexLength(p) + (PRECEDENCE[p.kind] < minPrecedence ? 2 : 0)
+  let length: number
+  switch (regex.kind) {
+    case 'empty':
+    case 'epsilon':
+      return 1
+    case 'symbol':
+      return escapeSymbol(regex.symbol).length
+    case 'union':
+    case 'concat': {
+      const min = regex.kind === 'union' ? 1 : 2
+      length = regex.parts.reduce((sum, p) => sum + inner(p, min), regex.parts.length - 1)
+      break
+    }
+    case 'star':
+      length = inner(regex.inner, 3) + 1
+      break
+  }
+  lengths.set(regex, length)
+  return length
 }
 
 /** r | s – ohne ∅, ohne Duplikate, verschachtelte Vereinigungen flach */
@@ -132,51 +193,68 @@ export function escapeSymbol(symbol: string): string {
  * Hat ein Symbol (aus `alphabet` oder dem Ausdruck) mehrere Zeichen, stehen zwischen den Teilen
  * einer Verkettung Leerzeichen – sonst liest `parseRegex` z. B. „a“ „b“ bei Σ = {a, b, ab} als
  * das eine Symbol „ab“.
+ *
+ * Die Stücke entstehen erst beim Durchlaufen: Wer nur den Anfang braucht (`compactRegexParts`
+ * mit Grenze), schreibt den Rest nie aus.
  */
-export function formatRegexParts(regex: Regex, alphabet: string[] = []): RegexPart[] {
+export function* regexParts(regex: Regex, alphabet: string[] = []): Generator<RegexPart> {
   const separate = [...alphabet, ...regexSymbols(regex)].some((s) => [...s].length > 1)
-  const format = (r: Regex): RegexPart[] => {
-    const inner = (p: Regex, minPrecedence: number): RegexPart[] => {
-      const parts = format(p)
-      return PRECEDENCE[p.kind] < minPrecedence ? [{ text: '(' }, ...parts, { text: ')' }] : parts
-    }
+  function* inner(p: Regex, minPrecedence: number): Generator<RegexPart> {
+    const parens = PRECEDENCE[p.kind] < minPrecedence
+    if (parens) yield { text: '(' }
+    yield* format(p)
+    if (parens) yield { text: ')' }
+  }
+  function* format(r: Regex): Generator<RegexPart> {
     switch (r.kind) {
       case 'empty':
-        return [{ text: EMPTY_SET }]
+        yield { text: EMPTY_SET }
+        return
       case 'epsilon':
-        return [{ text: EPSILON }]
+        yield { text: EPSILON }
+        return
       case 'symbol':
-        return [{ text: escapeSymbol(r.symbol) }]
+        yield { text: escapeSymbol(r.symbol) }
+        return
       case 'union':
-        return r.parts.flatMap((p, i) => [
-          ...(i > 0 ? [{ text: UNION_SYMBOL }] : []),
-          ...inner(p, 1)
-        ])
+        for (const [i, p] of r.parts.entries()) {
+          if (i > 0) yield { text: UNION_SYMBOL }
+          yield* inner(p, 1)
+        }
+        return
       case 'concat':
-        return r.parts.flatMap((p, i) => [
-          ...(i > 0 && separate ? [{ text: ' ' }] : []),
-          ...inner(p, 2)
-        ])
+        for (const [i, p] of r.parts.entries()) {
+          if (i > 0 && separate) yield { text: ' ' }
+          yield* inner(p, 2)
+        }
+        return
       case 'star':
-        return [...inner(r.inner, 3), { text: '*', sup: true }]
+        yield* inner(r.inner, 3)
+        yield { text: '*', sup: true }
     }
   }
-  return format(regex)
+  yield* format(regex)
+}
+
+/** Alle Stücke der Ausgabe (`regexParts`) als Liste */
+export function formatRegexParts(regex: Regex, alphabet: string[] = []): RegexPart[] {
+  return [...regexParts(regex, alphabet)]
 }
 
 /** Text mit möglichst wenigen Klammern, z. B. „(a+b)*ab“ oder „x1 x2*“. */
 export function formatRegex(regex: Regex, alphabet: string[] = []): string {
-  return formatRegexParts(regex, alphabet)
-    .map((p) => p.text)
-    .join('')
+  let text = ''
+  for (const part of regexParts(regex, alphabet)) text += part.text
+  return text
 }
 
 /**
  * Teile für die Anzeige: aufeinanderfolgender normaler Text als ein Stück, höchstens `limit`
- * Zeichen – ein längerer Ausdruck endet mit „…“ (`truncated`).
+ * Zeichen – ein längerer Ausdruck endet mit „…“ (`truncated`). Liest `parts` nur so weit wie
+ * nötig.
  */
 export function compactRegexParts(
-  parts: RegexPart[],
+  parts: Iterable<RegexPart>,
   limit = Infinity
 ): { parts: RegexPart[]; truncated: boolean } {
   const result: RegexPart[] = []
@@ -194,19 +272,21 @@ export function compactRegexParts(
   return { parts: result, truncated: false }
 }
 
-/** Alle Symbole, die im Ausdruck vorkommen */
+/** Alle Symbole, die im Ausdruck vorkommen – jeder geteilte Teilausdruck wird einmal besucht */
 export function regexSymbols(regex: Regex): Set<string> {
-  switch (regex.kind) {
-    case 'symbol':
-      return new Set([regex.symbol])
-    case 'union':
-    case 'concat':
-      return new Set(regex.parts.flatMap((p) => [...regexSymbols(p)]))
-    case 'star':
-      return regexSymbols(regex.inner)
-    default:
-      return new Set()
+  const symbols = new Set<string>()
+  const visited = new Set<Regex>()
+  const todo = [regex]
+  while (todo.length > 0) {
+    const r = todo.pop() as Regex
+    if (visited.has(r)) continue
+    visited.add(r)
+    if (r.kind === 'symbol') symbols.add(r.symbol)
+    else if (r.kind === 'star') todo.push(r.inner)
+    // Rückwärts auf den Stapel: Symbole kommen in Lesereihenfolge heraus
+    else if (r.kind === 'union' || r.kind === 'concat') todo.push(...[...r.parts].reverse())
   }
+  return symbols
 }
 
 // --- Parser ------------------------------------------------------------------------

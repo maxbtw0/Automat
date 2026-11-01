@@ -8,8 +8,8 @@ import {
   UNION_SYMBOL,
   compactRegexParts,
   formatRegex,
-  formatRegexParts,
   parseRegex,
+  regexParts,
   type Regex
 } from '@/core/regex/regex'
 import { regexToDocument } from '@/core/regex/toAutomaton'
@@ -170,7 +170,7 @@ const PREVIEW_LIMIT = 4000
 function RegexText({ regex, className }: { regex: Regex; className?: string }) {
   const alphabet = useEditorStore((s) => s.document.alphabet)
   const parts = useMemo(
-    () => compactRegexParts(formatRegexParts(regex, alphabet), PREVIEW_LIMIT).parts,
+    () => compactRegexParts(regexParts(regex, alphabet), PREVIEW_LIMIT).parts,
     [regex, alphabet]
   )
   return (

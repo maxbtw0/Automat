@@ -82,6 +82,29 @@ describe('automatonToRegex', () => {
   })
 })
 
+describe('automatonToRegex: Längengrenze', () => {
+  /** n Zustände, von jedem zu jedem eine Kante – der Ausdruck wächst exponentiell mit n */
+  function dense(n: number): AutomatonDocument {
+    const names = Array.from({ length: n }, (_, i) => `q${i}`)
+    const edges = names.flatMap((from, i) =>
+      names.map((to, j): [string, string, string] => [from, (i * n + j) % 2 ? 'a' : 'b', to])
+    )
+    return buildDocument('NFA', ['a', 'b'], { start: 'q0', finals: [names[n - 1]] }, edges)
+  }
+
+  it('meldet einen zu langen Ausdruck schnell, statt ihn zu bauen', () => {
+    const started = performance.now()
+    expect(() => automatonToRegex(dense(12))).toThrow('Ausdruck zu lang (über 100.000 Zeichen)')
+    expect(() => automatonToRegex(dense(40))).toThrow('Ausdruck zu lang')
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+
+  it('liefert Ausdrücke bis zur Grenze', () => {
+    expect(formatRegex(automatonToRegex(dense(6))).length).toBeLessThan(100_000)
+    expect(() => automatonToRegex(dense(4), 10)).toThrow('über 10 Zeichen')
+  })
+})
+
 describe('findDifference', () => {
   const endsWithAb = buildDocument('NFA', ['a', 'b'], { start: 'q0', finals: ['q2'] }, [
     ['q0', 'a,b', 'q0'],

@@ -1,7 +1,14 @@
 import { freshStateId, usedStateIds } from '@/core/algorithms/ids'
 import { startState } from '@/core/automaton/validation'
 import { EPSILON, edgeSymbols, type AutomatonDocument, type StateId } from '@/model/graph'
-import { concat, empty, epsilon, star, symbol, union, type Regex } from './regex'
+import { concat, empty, epsilon, regexLength, star, symbol, union, type Regex } from './regex'
+
+/**
+ * Längster Ausdruck, den die Zustandselimination liefert (Zeichen, obere Schranke). Intern teilen
+ * sich die Kanten ihre Teilausdrücke, ausgeschrieben wächst das Ergebnis aber exponentiell –
+ * schon zehn Zustände mit allen Kanten ergeben fast eine Million Zeichen.
+ */
+export const MAX_REGEX_LENGTH = 100_000
 
 /**
  * Zustandselimination: Automat (DEA oder NEA) → gleichwertiger regulärer Ausdruck.
@@ -12,11 +19,16 @@ import { concat, empty, epsilon, star, symbol, union, type Regex } from './regex
  *    p –R(p,q) R(q,q)* R(q,r)→ r, vereinigt mit der bisherigen Kante p → r.
  * 3. Übrig bleibt S → F – deren Ausdruck beschreibt die Sprache des Automaten.
  *
+ * 4. Ist das Ergebnis länger als `maxLength` Zeichen, gibt es einen Fehler statt des Ausdrucks.
+ *
  * Die Reihenfolge beeinflusst nur die Form des Ergebnisses, nicht die Sprache. Zuerst wird
  * der Zustand mit den wenigsten Weg-Kombinationen (Eingänge × Ausgänge) entfernt – das hält
  * den Ausdruck meist kurz.
  */
-export function automatonToRegex(document: AutomatonDocument): Regex {
+export function automatonToRegex(
+  document: AutomatonDocument,
+  maxLength = MAX_REGEX_LENGTH
+): Regex {
   const { graph } = document
   const start = startState(graph)
   if (!start) throw new Error('Kein Startzustand')
@@ -78,5 +90,9 @@ export function automatonToRegex(document: AutomatonDocument): Regex {
     into.delete(q)
   }
 
-  return get(NEW_START, NEW_FINAL)
+  const result = get(NEW_START, NEW_FINAL)
+  if (regexLength(result) > maxLength) {
+    throw new Error(`Ausdruck zu lang (über ${maxLength.toLocaleString('de-DE')} Zeichen)`)
+  }
+  return result
 }

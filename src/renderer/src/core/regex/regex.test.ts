@@ -6,9 +6,13 @@ import {
   formatRegex,
   formatRegexParts,
   parseRegex,
+  regexLength,
+  regexParts,
+  regexSymbols,
   star,
   symbol,
-  union
+  union,
+  type Regex
 } from './regex'
 
 const roundtrip = (input: string, alphabet?: string[]): string =>
@@ -79,6 +83,28 @@ describe('compactRegexParts', () => {
       parts: [{ text: '(a+b' }, { text: '…' }],
       truncated: true
     })
+  })
+})
+
+describe('regexLength und regexParts', () => {
+  it('regexLength stimmt mit der Ausgabe überein, ohne sie zu bauen', () => {
+    const alphabet = ['a', 'b', 'ab']
+    for (const input of ['(a+b)*a', 'a b*+ε', '(ab+a)* b', '∅', '\\(*']) {
+      const r = parseRegex(input, alphabet)
+      expect(regexLength(r), input).toBe(formatRegex(r, alphabet).length)
+      expect(regexLength(r), input).toBeGreaterThanOrEqual(formatRegex(r).length)
+    }
+  })
+
+  it('geteilte Teilausdrücke: Länge exponentiell, Vorschau liest nur den Anfang', () => {
+    // r(k+1) = (r(k) + r(k)·a) – als Baum ausgeschrieben 2^k-mal so groß, geteilt nur k Knoten
+    let r: Regex = symbol('a')
+    for (let k = 0; k < 60; k++) r = union(r, concat(r, symbol('b')))
+    expect(regexLength(r)).toBeGreaterThan(2 ** 60)
+    const preview = compactRegexParts(regexParts(r), 100)
+    expect(preview.truncated).toBe(true)
+    expect(preview.parts.map((p) => p.text).join('').length).toBeLessThanOrEqual(101)
+    expect(regexSymbols(r)).toEqual(new Set(['a', 'b']))
   })
 })
 
