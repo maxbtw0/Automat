@@ -4,11 +4,14 @@ import { createEmptyDocument } from '@/model/graph'
 import { deserializeDocument } from '@/model/serialization'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
+import { useScreenStore } from '@/store/screenStore'
+import { serializeDocument } from '@/model/serialization'
 import {
   closeWindow,
   confirmDiscard,
   displayName,
   newFile,
+  openFile,
   runMenuAction,
   saveFile
 } from './fileActions'
@@ -145,13 +148,19 @@ describe('Rückfrage bei ungespeicherten Änderungen', () => {
 
 describe('Speichern während weiterer Änderungen', () => {
   const store = () => useEditorStore.getState()
-  let finish: (path: string | null) => void = () => {}
+  const waiting: ((path: string | null) => void)[] = []
   let saved = ''
+
+  /** Beendet den ältesten laufenden Schreibauftrag, sobald er beim Hauptprozess ankommt. */
+  async function finish(path: string | null): Promise<void> {
+    await vi.waitFor(() => expect(waiting).not.toHaveLength(0))
+    waiting.shift()?.(path)
+  }
 
   beforeEach(() => {
     const saveFile: AutomatApi['saveFile'] = (content) => {
       saved = content
-      return new Promise((resolve) => (finish = resolve))
+      return new Promise((resolve) => waiting.push(resolve))
     }
     vi.stubGlobal('window', { api: { saveFile } })
     store().newDocument()
@@ -163,7 +172,7 @@ describe('Speichern während weiterer Änderungen', () => {
   it('Änderungen während des Schreibens bleiben ungespeichert', async () => {
     const pending = saveFile()
     store().addState(100, 0)
-    finish('/automaten/dea.json')
+    await finish('/automaten/dea.json')
     await pending
 
     expect(deserializeDocument(saved).graph.states).toHaveLength(1)
@@ -175,12 +184,79 @@ describe('Speichern während weiterer Änderungen', () => {
 
   it('ein inzwischen geöffnetes Dokument behält seinen Pfad', async () => {
     const pending = saveFile()
+    await vi.waitFor(() => expect(waiting).toHaveLength(1))
     store().loadDocument(createEmptyDocument('NFA'), '/automaten/nea.json')
-    finish('/automaten/dea.json')
+    await finish('/automaten/dea.json')
     await pending
 
     expect(store().filePath).toBe('/automaten/nea.json')
     expect(store().dirty).toBe(false)
+  })
+
+  it('ein älterer Abschluss überholt keinen neueren', async () => {
+    const first = saveFile()
+    store().addState(100, 0)
+    const second = saveFile()
+    await finish('/automaten/dea.json')
+    await first
+    expect(store().dirty).toBe(true)
+    await finish('/automaten/dea.json')
+    await second
+    expect(deserializeDocument(saved).graph.states).toHaveLength(2)
+    expect(store().dirty).toBe(false)
+  })
+})
+
+describe('Öffnen während weiterer Änderungen', () => {
+  const store = () => useEditorStore.getState()
+  const dialog = () => useDialogStore.getState()
+  let finish: ((content: string) => void) | null = null
+
+  /** Wartet, bis der Datei-Dialog läuft, und liefert dann den Inhalt. */
+  async function answerWith(content: string): Promise<void> {
+    await vi.waitFor(() => expect(finish).not.toBeNull())
+    finish?.(content)
+  }
+
+  beforeEach(() => {
+    finish = null
+    const openFile: AutomatApi['openFile'] = () =>
+      new Promise((resolve) => (finish = (content) => resolve({ filePath: '/nea.json', content })))
+    vi.stubGlobal('window', { api: { openFile } })
+    store().newDocument()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  const otherFile = () => serializeDocument(createEmptyDocument('NFA'))
+
+  it('fragt erneut, wenn sich der Automat beim Lesen geändert hat', async () => {
+    const pending = openFile()
+    await vi.waitFor(() => expect(finish).not.toBeNull())
+    store().addState(0, 0)
+    await answerWith(otherFile())
+    await vi.waitFor(() => expect(dialog().request).not.toBeNull())
+    dialog().answer(2)
+    await pending
+    expect(store().document.graph.states).toHaveLength(1)
+    expect(store().dirty).toBe(true)
+  })
+
+  it('verwirft die Datei, wenn inzwischen ein anderes Dokument offen ist', async () => {
+    const pending = openFile()
+    await vi.waitFor(() => expect(finish).not.toBeNull())
+    store().loadDocument(createEmptyDocument('DFA'), '/dea.json')
+    await answerWith(otherFile())
+    await pending
+    expect(store().filePath).toBe('/dea.json')
+  })
+
+  it('öffnet die Datei ohne Zwischenänderungen', async () => {
+    const pending = openFile()
+    await answerWith(otherFile())
+    await pending
+    expect(store().document.type).toBe('NFA')
+    expect(store().filePath).toBe('/nea.json')
   })
 })
 
@@ -205,5 +281,14 @@ describe('Menüaktionen bei offenem Fenster', () => {
     store().select({ kind: 'state', id })
     runMenuAction('delete')
     expect(store().document.graph.states).toHaveLength(0)
+  })
+
+  it('„Auswahl löschen“ wirkt nur im Grapheneditor', () => {
+    const id = store().addState(0, 0)
+    store().select({ kind: 'state', id })
+    useScreenStore.getState().setScreen('transitionTable')
+    runMenuAction('delete')
+    useScreenStore.getState().setScreen('graph')
+    expect(store().document.graph.states).toHaveLength(1)
   })
 })

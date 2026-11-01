@@ -1,8 +1,10 @@
 import type { MenuAction, OpenFileResult } from '@shared/ipc'
+import type { AutomatonDocument } from '@/model/graph'
 import { describeError } from '@/core/automaton/errors'
 import { deserializeDocument, serializeDocument } from '@/model/serialization'
 import { askChoice, isModalOpen } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
+import { useScreenStore } from '@/store/screenStore'
 import { commitActiveInput } from '@/utils/dom'
 import { openExportDialog } from './exportActions'
 import { openHelp } from './helpActions'
@@ -72,10 +74,16 @@ export async function newFile(): Promise<void> {
 export async function openFile(): Promise<void> {
   if (!(await confirmDiscard())) return
   const store = useEditorStore.getState()
+  // Das Lesen ist asynchron – wer währenddessen weiterarbeitet, soll nichts verlieren
+  const { session, document: before } = store
   try {
     const result = window.api ? await window.api.openFile() : await openFileInBrowser()
     if (!result) return
     const document = deserializeDocument(result.content)
+    const now = useEditorStore.getState()
+    if (now.session !== session) return
+    if (now.document !== before && !(await confirmDiscard())) return
+    if (useEditorStore.getState().session !== session) return
     // Im Browser ist das nur der Dateiname (ohne Ordner) – reicht für den Anzeigenamen.
     store.loadDocument(document, result.filePath)
     store.setStatus(null)
@@ -84,11 +92,26 @@ export async function openFile(): Promise<void> {
   }
 }
 
-export async function saveFile(saveAs = false): Promise<void> {
+/** Speichervorgänge laufen nacheinander – ein älterer Abschluss überholt nie einen neueren. */
+let saving: Promise<void> = Promise.resolve()
+
+export function saveFile(saveAs = false): Promise<void> {
   commitActiveInput()
-  const store = useEditorStore.getState()
   // Gespeichert wird dieser Stand – Änderungen während des Schreibens bleiben ungespeichert
-  const { document, session } = store
+  const { document, session } = useEditorStore.getState()
+  const job = saving.then(() => writeDocument(document, session, saveAs))
+  saving = job
+  return job
+}
+
+async function writeDocument(
+  document: AutomatonDocument,
+  session: number,
+  saveAs: boolean
+): Promise<void> {
+  const store = useEditorStore.getState()
+  // Inzwischen ein anderes Dokument geöffnet → dieser Stand ist nicht mehr zu speichern
+  if (store.session !== session) return
   const content = serializeDocument(document)
   try {
     if (window.api) {
@@ -130,7 +153,8 @@ export function runMenuAction(action: MenuAction): void {
       store.redo()
       break
     case 'delete':
-      store.deleteSelection()
+      // Wie das Tastenkürzel nur im Grapheneditor – andere Screens haben ihre eigene Auswahl
+      if (useScreenStore.getState().screen === 'graph') store.deleteSelection()
       break
     case 'export':
       openExportDialog()

@@ -7,7 +7,7 @@ import {
   shell,
   type MenuItemConstructorOptions
 } from 'electron'
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import iconIco from '../../build/icon.ico?asset'
 import iconPng from '../../build/icon.png?asset'
@@ -19,6 +19,7 @@ import {
   serializeSettings,
   type Settings
 } from '../shared/settings'
+import { safeWriteFile } from './safeWrite'
 
 // Stürzt der GPU-Prozess mehr als sechsmal ab (z. B. Treiber-Resets im Standby), beendet
 // Chromium sonst die ganze App ohne Rückfrage. So startet er stattdessen einfach neu.
@@ -52,9 +53,7 @@ async function readSettings(): Promise<Settings> {
 async function writeSettings(next: Settings): Promise<void> {
   const file = settingsFile()
   await mkdir(dirname(file), { recursive: true })
-  // Erst eine Hilfsdatei, dann umbenennen – bricht das Schreiben ab, bleibt die alte Datei heil.
-  await writeFile(`${file}.tmp`, serializeSettings(next), 'utf-8')
-  await rename(`${file}.tmp`, file)
+  await safeWriteFile(file, serializeSettings(next))
 }
 
 const FILE_FILTERS = [
@@ -206,7 +205,7 @@ function registerIpcHandlers(): void {
     async (event, content: string, filePath: string | null): Promise<string | null> => {
       const target = filePath ?? (await askSavePath(event.sender, 'Automat speichern'))
       if (!target) return null
-      await writeFile(target, content, 'utf-8')
+      await safeWriteFile(target, content)
       return target
     }
   )
@@ -216,7 +215,7 @@ function registerIpcHandlers(): void {
     async (event, defaultName: string, filter: FileFilter, data: Uint8Array) => {
       const target = await askSavePath(event.sender, 'Exportieren', defaultName, [filter])
       if (!target) return null
-      await writeFile(target, data)
+      await safeWriteFile(target, data)
       return target
     }
   )
@@ -238,7 +237,7 @@ function registerIpcHandlers(): void {
       await Promise.all(
         files.map((data, i) => {
           const number = String(i + 1).padStart(Math.max(2, digits), '0')
-          return writeFile(join(folder, `${baseName}-${number}.${extension}`), data)
+          return safeWriteFile(join(folder, `${baseName}-${number}.${extension}`), data)
         })
       )
       return folder
@@ -264,7 +263,7 @@ function registerIpcHandlers(): void {
         // Ränder macht das HTML selbst, damit dunkle Seiten randlos sind
         margins: { top: 0, bottom: 0, left: 0, right: 0 }
       })
-      await writeFile(target, pdf)
+      await safeWriteFile(target, pdf)
       return target
     } finally {
       printer.destroy()
