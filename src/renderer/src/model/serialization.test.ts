@@ -77,6 +77,7 @@ describe('serialization: beschädigte Dateien', () => {
     const { label: _label, ...noLabel } = state
     expect(() => deserializeDocument(file(graph([state, noLabel])))).toThrow('Zustand Nr. 2')
     expect(() => deserializeDocument(file(graph([state, state])))).toThrow('„s1“ doppelt')
+    expect(() => deserializeDocument(file(graph([{ ...state, id: '' }])))).toThrow('ohne ID')
   })
 
   it('lehnt kaputte Übergänge und Regeln ab', () => {
@@ -88,6 +89,26 @@ describe('serialization: beschädigte Dateien', () => {
     expect(load({ ...t, labels: [null] })).toThrow('ungültig')
     expect(load({ ...t, labels: [{ read: 'a', push: 'A' }] })).toThrow('ungültig')
     expect(load({ ...t, labels: [{ read: 'a', move: 'X' }] })).toThrow('ungültig')
+    expect(load({ ...t, id: '' })).toThrow('Übergang Nr. 1 ohne ID')
+  })
+
+  it('übernimmt nur bekannte Felder – tief verschachtelte Zusatzdaten fallen weg', () => {
+    let deep: unknown[] = []
+    for (let i = 0; i < 10_000; i++) deep = [deep]
+    const extra = { extra: 1 }
+    const t = { id: 't1', from: 's1', to: 's1', labels: [{ read: 'a', ...extra }], ...extra }
+    const text = file({ ...graph([{ ...state, ...extra }], [t]), stack: undefined, deep })
+    const loaded = deserializeDocument(text)
+
+    expect(loaded).toEqual({
+      type: 'DFA',
+      alphabet: ['a'],
+      graph: {
+        states: [state],
+        transitions: [{ id: 't1', from: 's1', to: 's1', labels: [{ read: 'a' }] }]
+      }
+    })
+    expect(() => serializeDocument(loaded)).not.toThrow()
   })
 
   it('lehnt leere, doppelte und falsch typisierte Alphabetsymbole ab', () => {

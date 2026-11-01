@@ -113,7 +113,8 @@ export function saveFile(saveAs = false): Promise<void> {
   commitActiveInput()
   // Gespeichert wird dieser Stand – Änderungen während des Schreibens bleiben ungespeichert
   const { document, session } = useEditorStore.getState()
-  const job = saving.then(() => writeDocument(document, session, saveAs))
+  // Auch nach einem gescheiterten Auftrag geht es weiter – sonst hinge jeder folgende daran
+  const job = saving.catch(() => undefined).then(() => writeDocument(document, session, saveAs))
   saving = job
   return job
 }
@@ -126,8 +127,8 @@ async function writeDocument(
   const store = useEditorStore.getState()
   // Inzwischen ein anderes Dokument geöffnet → dieser Stand ist nicht mehr zu speichern
   if (store.session !== session) return
-  const content = serializeDocument(document)
   try {
+    const content = serializeDocument(document)
     if (window.api) {
       const path = await window.api.saveFile(content, saveAs ? null : store.filePath)
       // Inzwischen ein anderes Dokument geöffnet → der Pfad gehört nicht mehr dazu

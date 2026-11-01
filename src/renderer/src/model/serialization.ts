@@ -110,6 +110,8 @@ function checkStates(states: unknown[]): void {
   const ids = new Set<string>()
   states.forEach((s, i) => {
     if (!isState(s)) fail(`Zustand Nr. ${i + 1} ungültig`)
+    // '' ist keine ID – manche Stellen lesen eine leere ID als „kein Zustand“
+    if (s.id === '') fail(`Zustand Nr. ${i + 1} ohne ID`)
     if (ids.has(s.id)) fail(`Zustand „${s.id}“ doppelt`)
     ids.add(s.id)
   })
@@ -119,6 +121,7 @@ function checkTransitions(transitions: unknown[]): void {
   const ids = new Set<string>()
   transitions.forEach((t, i) => {
     if (!isTransition(t)) fail(`Übergang Nr. ${i + 1} ungültig`)
+    if (t.id === '') fail(`Übergang Nr. ${i + 1} ohne ID`)
     if (ids.has(t.id)) fail(`Übergang „${t.id}“ doppelt`)
     ids.add(t.id)
   })
@@ -172,12 +175,8 @@ export function deserializeDocument(text: string): AutomatonDocument {
     throw new Error('Die Datei enthält keinen gültigen Automaten.')
   }
 
-  // Ältere Dateien enthalten noch ein Feld `name` – der Name kommt inzwischen vom Dateinamen.
-  const document: Record<string, unknown> = { ...doc }
-  delete document.name
   const transitions =
     data.version < 2 ? migrateSymbolsToLabels(doc.graph.transitions) : doc.graph.transitions
-  document.graph = { ...doc.graph, transitions }
 
   checkAlphabet(doc.alphabet, 'Σ')
   checkStack(doc.stack)
@@ -185,8 +184,50 @@ export function deserializeDocument(text: string): AutomatonDocument {
   checkOutput(doc.output)
   checkStates(doc.graph.states)
   checkTransitions(transitions)
-  document.graph = { ...doc.graph, transitions: mergeParallel(transitions as TransitionEdge[]) }
-  return document as unknown as AutomatonDocument
+  return pickDocument(doc as unknown as AutomatonDocument, transitions as TransitionEdge[])
+}
+
+// --- Nur bekannte Felder übernehmen ----------------------------------------------------
+// Unbekannte Felder (z. B. `name` aus älteren Dateien oder beliebige Zusatzdaten) fallen weg.
+// Sonst landen sie beim nächsten Speichern wieder in der Datei – und tief verschachtelte
+// Zusatzdaten lassen `JSON.stringify` scheitern.
+
+function pickLabel(label: TransitionLabel): TransitionLabel {
+  const { read, pop, push, write, move, output } = label
+  return {
+    read,
+    ...(pop !== undefined && { pop }),
+    ...(push !== undefined && { push: [...push] }),
+    ...(write !== undefined && { write }),
+    ...(move !== undefined && { move }),
+    ...(output !== undefined && { output: [...output] })
+  }
+}
+
+function pickState({ id, label, x, y, isStart, isFinal, output }: StateNode): StateNode {
+  const moore = output !== undefined && { output: [...output] }
+  return { id, label, x, y, isStart, isFinal, ...moore }
+}
+
+function pickTransition({ id, from, to, labels }: TransitionEdge): TransitionEdge {
+  return { id, from, to, labels: labels.map(pickLabel) }
+}
+
+function pickDocument(doc: AutomatonDocument, transitions: TransitionEdge[]): AutomatonDocument {
+  const { type, alphabet, stack, tape, output, graph } = doc
+  return {
+    type,
+    alphabet: [...alphabet],
+    ...(stack && {
+      stack: { alphabet: [...stack.alphabet], start: stack.start, acceptance: stack.acceptance }
+    }),
+    ...(tape && { tape: { alphabet: [...tape.alphabet], blank: tape.blank } }),
+    ...(output && { output: { alphabet: [...output.alphabet] } }),
+    graph: {
+      states: graph.states.map(pickState),
+      transitions: mergeParallel(transitions.map(pickTransition))
+    }
+  }
 }
 
 /**

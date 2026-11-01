@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AutomatApi } from '@shared/ipc'
-import { createEmptyDocument } from '@/model/graph'
+import { createEmptyDocument, type AutomatonDocument } from '@/model/graph'
 import { deserializeDocument } from '@/model/serialization'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
@@ -204,6 +204,37 @@ describe('Speichern während weiterer Änderungen', () => {
     await finish('/automaten/dea.json')
     await second
     expect(deserializeDocument(saved).graph.states).toHaveLength(2)
+    expect(store().dirty).toBe(false)
+  })
+})
+
+describe('Speichern nach einem Fehler', () => {
+  const store = () => useEditorStore.getState()
+  const saveFileApi = vi.fn<AutomatApi['saveFile']>()
+
+  beforeEach(() => {
+    vi.stubGlobal('window', { api: { saveFile: saveFileApi } })
+    saveFileApi.mockReset().mockResolvedValue('/automaten/dea.json')
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('meldet einen Serialisierungsfehler und speichert danach wieder', async () => {
+    // Ein Kreis im Dokument lässt JSON.stringify scheitern
+    const broken: Record<string, unknown> = { ...createEmptyDocument('DFA') }
+    broken.self = broken
+    store().loadDocument(broken as unknown as AutomatonDocument, null)
+    store().addState(0, 0)
+
+    await saveFile()
+    expect(store().status?.kind).toBe('error')
+    expect(store().dirty).toBe(true)
+    expect(saveFileApi).not.toHaveBeenCalled()
+
+    store().loadDocument(createEmptyDocument('NFA'), null)
+    store().addState(0, 0)
+    await saveFile()
+    expect(saveFileApi).toHaveBeenCalledOnce()
     expect(store().dirty).toBe(false)
   })
 })
