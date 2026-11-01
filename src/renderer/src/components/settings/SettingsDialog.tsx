@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { sameSettings, settingsValid, type Settings } from '@shared/settings'
 import { askChoice, useDialogStore } from '@/store/dialogStore'
 import { useSettingsStore } from '@/store/settingsStore'
-import { classNames, isEditableTarget } from '@/utils/dom'
+import { classNames, inertOutside, isEditableTarget } from '@/utils/dom'
 import { AlphabetPresetsTab } from './AlphabetPresetsTab'
 import { KeybindingsTab } from './KeybindingsTab'
 import { NewAutomatonTab } from './NewAutomatonTab'
@@ -63,7 +63,7 @@ function SettingsWindow() {
   }, [dirty])
 
   return (
-    <div className="dialog-backdrop">
+    <div className="dialog-backdrop" ref={inertOutside}>
       <div
         className="dialog settings-dialog"
         role="dialog"

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useDialogStore } from '@/store/dialogStore'
-import { classNames } from '@/utils/dom'
+import { classNames, inertOutside } from '@/utils/dom'
 
 /** Zeigt den aktuellen Dialog aus dem dialogStore an (einmal in App eingebunden). */
 export function DialogHost() {
@@ -19,7 +19,7 @@ export function DialogHost() {
   if (!request) return null
 
   return (
-    <div className="dialog-backdrop">
+    <div className="dialog-backdrop" ref={inertOutside}>
       <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title">
         <h2 id="dialog-title" className="dialog-title">
           {request.title}

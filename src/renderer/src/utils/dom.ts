@@ -23,3 +23,33 @@ export function commitActiveInput(): void {
 export function classNames(...names: Array<string | false | null | undefined>): string {
   return names.filter(Boolean).join(' ')
 }
+
+/** Wie viele offene Fenster ein Element gerade sperren – übereinanderliegende zählen mit */
+const inertBy = new WeakMap<Element, number>()
+
+/**
+ * Ref-Callback für den Hintergrund (`.dialog-backdrop`) eines modalen Fensters: Alles außerhalb
+ * wird `inert` – kein Fokus per Tab, keine Klicks, keine Enter-Taste auf Knöpfen dahinter –,
+ * bis das Fenster verschwindet. Ein Fenster über einem anderen sperrt auch das untere.
+ */
+export function inertOutside(element: HTMLElement | null): (() => void) | undefined {
+  if (!element) return undefined
+  const locked: HTMLElement[] = []
+  for (let node = element; node.parentElement && node !== document.body; ) {
+    const parent: HTMLElement = node.parentElement
+    for (const sibling of parent.children) {
+      if (sibling === node || !(sibling instanceof HTMLElement)) continue
+      inertBy.set(sibling, (inertBy.get(sibling) ?? 0) + 1)
+      sibling.inert = true
+      locked.push(sibling)
+    }
+    node = parent
+  }
+  return () => {
+    for (const sibling of locked) {
+      const count = (inertBy.get(sibling) ?? 1) - 1
+      inertBy.set(sibling, count)
+      if (count === 0) sibling.inert = false
+    }
+  }
+}

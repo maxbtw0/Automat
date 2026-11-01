@@ -11,7 +11,7 @@ import {
 } from '@/model/graph'
 import type { TuringCell } from '@/model/turingTable'
 import { useDialogStore } from '@/store/dialogStore'
-import { classNames, isEditableTarget } from '@/utils/dom'
+import { classNames, inertOutside, isEditableTarget } from '@/utils/dom'
 
 const MOVE_TITLES: Record<TapeMove, string> = {
   L: 'Links (L)',
@@ -140,7 +140,11 @@ export function TuringCellDialog({
   const selectAll = (e: { currentTarget: HTMLInputElement }): void => e.currentTarget.select()
 
   return (
-    <div className="dialog-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="dialog-backdrop"
+      ref={inertOutside}
+      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div
         className="dialog turing-cell-dialog"
         role="dialog"

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { getAutomatonDefinition } from '@/core/automaton/registry'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
-import { classNames } from '@/utils/dom'
+import { classNames, inertOutside } from '@/utils/dom'
 import { HelpPage } from './HelpPages'
 import { HELP_GROUPS, helpTabKey, initialHelpTab, type HelpTab } from './helpTabs'
 
@@ -41,7 +41,7 @@ function HelpWindow() {
   }, [])
 
   return (
-    <div className="dialog-backdrop">
+    <div className="dialog-backdrop" ref={inertOutside}>
       <div
         className="dialog settings-dialog help-dialog"
         role="dialog"

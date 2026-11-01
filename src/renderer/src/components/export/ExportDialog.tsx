@@ -18,7 +18,7 @@ import {
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
-import { classNames } from '@/utils/dom'
+import { classNames, inertOutside } from '@/utils/dom'
 
 const FORMAT_LABEL: Record<ExportFormat, string> = {
   csv: 'CSV',
@@ -165,7 +165,7 @@ export function ExportDialog() {
   }
 
   return (
-    <div className="dialog-backdrop">
+    <div className="dialog-backdrop" ref={inertOutside}>
       <div
         className="dialog export-dialog"
         role="dialog"
