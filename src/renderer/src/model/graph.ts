@@ -6,6 +6,7 @@
  */
 
 import type { AutomatonType, StackAcceptance, TapeMove } from '@shared/automatonTypes'
+import { overlapProblem } from '@shared/alphabetRules'
 import { DEFAULT_NEW_AUTOMATON, type NewAutomatonSettings } from '@shared/newAutomaton'
 
 export { AUTOMATON_TYPES, TAPE_MOVES } from '@shared/automatonTypes'
@@ -310,14 +311,23 @@ export const STACK_CANDIDATES = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789']
 /** Ausgaben üblicherweise Ziffern: 0, 1, …, 9, dann a, b, … */
 export const OUTPUT_CANDIDATES = [...'0123456789abcdefghijklmnopqrstuvwxyz']
 
-/** Nächstes freies Symbol: a, b, …, z, dann 0, …, 9, dann x1, x2, … */
+/** Nach den üblichen Kandidaten: griechische Buchstaben ohne ε */
+const EXTRA_CANDIDATES = [...'αβγδζηθικλμνξοπρστυφχψω']
+
+/**
+ * Nächstes freies Symbol: a, b, …, z, dann 0, …, 9, dann α, β, … – immer ein einzelnes Zeichen,
+ * das in keinem Mehrzeichen-Symbol steckt (`overlapProblem`).
+ */
 export function nextFreeSymbol(alphabet: string[], candidates = INPUT_CANDIDATES): string {
-  const used = new Set(alphabet)
-  const free = candidates.find((c) => !used.has(c))
-  if (free) return free
-  let i = 1
-  while (used.has(`x${i}`)) i++
-  return `x${i}`
+  const free = (s: string): boolean =>
+    s !== EPSILON && !alphabet.includes(s) && overlapProblem(alphabet, s) === null
+  const found = [...candidates, ...EXTRA_CANDIDATES].find(free)
+  if (found) return found
+  // Alles Übliche belegt: der nächste freie Buchstabe ab U+0100
+  for (let code = 0x100; ; code++) {
+    const c = String.fromCodePoint(code)
+    if (/\p{L}/u.test(c) && free(c)) return c
+  }
 }
 
 /**
@@ -332,7 +342,10 @@ export function validateSymbol(alphabet: string[], symbol: string, previous?: st
   // Diese Zeichen trennen Symbole in parseSymbols – im Symbol selbst wären sie mehrdeutig.
   if (/[,;\s]/.test(symbol)) return 'Ein Symbol darf kein Leerzeichen, Komma oder Semikolon enthalten.'
   if (symbol !== previous && alphabet.includes(symbol)) return `„${symbol}“ doppelt`
-  return null
+  return overlapProblem(
+    alphabet.filter((s) => s !== previous),
+    symbol
+  )
 }
 
 /**

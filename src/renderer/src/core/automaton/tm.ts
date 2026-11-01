@@ -9,7 +9,7 @@ import { UndecidedError } from './errors'
 import { asTuring } from './labels'
 import { TuringSimulator } from './tmSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
-import { checkFinal, checkReachability, checkStart } from './validation'
+import { checkAlphabets, checkFinal, checkReachability, checkStart } from './validation'
 
 /**
  * Deterministische Turingmaschine (TM) als Akzeptor.
@@ -33,6 +33,7 @@ export class TuringMachine implements Automaton {
     const { graph } = this.document
     return [
       ...checkStart(graph),
+      ...checkAlphabets(this.document),
       ...this.checkTape(),
       ...this.checkLabels(),
       ...this.checkDeterminism(),

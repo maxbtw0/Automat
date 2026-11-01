@@ -9,7 +9,7 @@ import { UndecidedError } from './errors'
 import { asPushdown, formatLabel, type PushdownLabel } from './labels'
 import { PushdownSimulator } from './pdaSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
-import { checkFinal, checkReachability, checkStart } from './validation'
+import { checkAlphabets, checkFinal, checkReachability, checkStart } from './validation'
 
 /**
  * Kellerautomat (KA, englisch PDA) als Akzeptor.
@@ -44,6 +44,7 @@ export class PushdownAutomaton implements Automaton {
     const { acceptance } = stackSettings(this.document)
     return [
       ...checkStart(graph),
+      ...checkAlphabets(this.document),
       ...this.checkStackStart(),
       ...this.checkLabels(),
       ...(this.deterministic ? this.checkDeterminism() : []),

@@ -23,7 +23,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Reguläre Ausdrücke trennen Symbole mit mehreren Zeichen durch Leerzeichen',
       'Der NEA liest ein „ε“ im Eingabewort nicht mehr über einen ε-Übergang',
       'Export sehr langer Simulationen funktioniert wieder, auch als PDF',
-      'Leerzeichen trennen Symbole im Eingabewort: bei Σ = {a, b, ab} ist „a b“ zwei Symbole',
+      'Ein Zeichen darf nicht einzeln und zugleich in einem längeren Symbol im Alphabet stehen',
+      'Leerzeichen trennen Symbole im Eingabewort',
       'Reguläre Ausdrücke lehnen „\\ε“ ab, Kellerautomaten melden „ε“ im Push-Wort als Fehler',
       'NEA-Simulation zeigt die ganze Zustandsmenge, den erklärten Pfad hervorgehoben'
     ]

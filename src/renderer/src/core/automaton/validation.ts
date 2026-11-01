@@ -1,3 +1,4 @@
+import { alphabetOverlap } from '@shared/alphabetRules'
 import {
   EPSILON,
   edgeSymbols,
@@ -51,6 +52,25 @@ export function checkReferences(graph: EditorGraph): ValidationIssue[] {
     if (message) issues.push({ severity: 'error', message, transitionIds: [t.id] })
   }
   return issues
+}
+
+/**
+ * Kein Zeichen einzeln und zugleich in einem Mehrzeichen-Symbol (`overlapProblem`) – in Σ und,
+ * falls vorhanden, im Stack-, Band- und Ausgabealphabet.
+ */
+export function checkAlphabets(document: AutomatonDocument): ValidationIssue[] {
+  const alphabets = [
+    document.alphabet,
+    document.stack?.alphabet,
+    document.tape?.alphabet,
+    document.output?.alphabet
+  ]
+  const messages = new Set<string>()
+  for (const alphabet of alphabets) {
+    const problem = alphabet && alphabetOverlap(alphabet)
+    if (problem) messages.add(problem)
+  }
+  return [...messages].map((message) => ({ severity: 'error', message }))
 }
 
 /** Symbole der Übergänge liegen in Σ (ε nur, wenn erlaubt); Übergänge ohne Symbol. */

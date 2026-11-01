@@ -2,6 +2,7 @@ import type { AutomatonDocument } from '@/model/graph'
 import { StateSetSimulator } from './setSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
 import {
+  checkAlphabets,
   checkCompleteness,
   checkDeterminism,
   checkFinal,
@@ -33,6 +34,7 @@ export class DFA implements Automaton {
     const { graph } = this.document
     return [
       ...checkStart(graph),
+      ...checkAlphabets(this.document),
       ...checkSymbols(this.document, { allowEpsilon: false }),
       ...checkDeterminism(graph),
       ...checkCompleteness(this.document),

@@ -103,3 +103,15 @@ describe('DFA', () => {
     expect(accepted).toBe(false)
   })
 })
+
+describe('DFA – Alphabet', () => {
+  it('meldet ein Zeichen, das einzeln und in einem Mehrzeichen-Symbol vorkommt', () => {
+    // Σ = {a, ab, b}: „ab“ wäre das Symbol ab oder die Folge a, b
+    const doc = buildDocument('DFA', ['a', 'ab', 'b'], { start: 'q0', finals: ['q1'] }, [
+      ['q0', 'a, b', 'q0'],
+      ['q0', 'ab', 'q1']
+    ])
+    const errors = new DFA(doc).validate().filter((i) => i.severity === 'error')
+    expect(errors.map((i) => i.message)).toContain('„a“ einzeln und in „ab“')
+  })
+})

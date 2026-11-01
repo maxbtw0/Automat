@@ -8,6 +8,7 @@ import {
 import { TransducerSimulator } from './transducerSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
 import {
+  checkAlphabets,
   checkCompleteness,
   checkDeterminism,
   checkReachability,
@@ -39,6 +40,7 @@ export class Transducer implements Automaton {
     const { graph } = this.document
     return [
       ...checkStart(graph),
+      ...checkAlphabets(this.document),
       ...checkSymbols(this.document, { allowEpsilon: false }),
       ...this.checkOutputs(),
       ...checkDeterminism(graph),

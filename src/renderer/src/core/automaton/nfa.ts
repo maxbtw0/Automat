@@ -1,7 +1,13 @@
 import { EPSILON, edgeSymbols, type AutomatonDocument } from '@/model/graph'
 import { StateSetSimulator } from './setSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
-import { checkFinal, checkReachability, checkStart, checkSymbols } from './validation'
+import {
+  checkAlphabets,
+  checkFinal,
+  checkReachability,
+  checkStart,
+  checkSymbols
+} from './validation'
 
 export { epsilonClosure, move, type StateSetResult } from './setSimulator'
 export { startState } from './validation'
@@ -24,6 +30,7 @@ export class NFA implements Automaton {
     const { graph } = this.document
     return [
       ...checkStart(graph),
+      ...checkAlphabets(this.document),
       ...checkSymbols(this.document, { allowEpsilon: true }),
       ...checkFinal(graph),
       ...checkReachability(graph)

@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { buildDocument } from './testing'
-import { createAutomaton } from './registry'
 import { joinWord, tokenizeWord } from './word'
 
 describe('tokenizeWord', () => {
@@ -23,15 +21,6 @@ describe('tokenizeWord', () => {
     expect(tokenizeWord(' ', ['a'])).toEqual([])
   })
 
-  it('jede Symbolfolge ist eingebbar: Σ = {a, b, ab}', () => {
-    const doc = buildDocument('DFA', ['a', 'b', 'ab'], { start: 'q0', finals: ['q2'] }, [
-      ['q0', 'a', 'q1'],
-      ['q1', 'b', 'q2']
-    ])
-    const automaton = createAutomaton(doc)
-    expect(automaton.accepts('a b')).toBe(true)
-    expect(automaton.accepts('ab')).toBe(false)
-  })
 })
 
 describe('joinWord', () => {

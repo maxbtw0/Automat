@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import type { AlphabetPreset } from '@shared/alphabetPresets'
+import { overlapProblem } from '@shared/alphabetRules'
 import { CommitInput } from '@/components/common/CommitInput'
 import { ContextMenu, type ContextMenuEntry } from '@/components/common/ContextMenu'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
@@ -202,6 +203,7 @@ export function AlphabetScreen() {
     if (!problem && hasTape && newSymbol !== oldSymbol) {
       const other = k === 'input' ? tape.alphabet : document.alphabet
       if (other.includes(newSymbol)) problem = `„${newSymbol}“ doppelt`
+      else problem = overlapProblem(other.filter((s) => s !== oldSymbol), newSymbol)
     }
     setError(problem)
     if (problem) return false

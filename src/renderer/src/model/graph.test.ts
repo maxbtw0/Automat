@@ -9,6 +9,16 @@ describe('nextFreeSymbol', () => {
   it('überspringt belegte Symbole', () => {
     expect(nextFreeSymbol(['a', 'b', 'd'])).toBe('c')
   })
+
+  it('nimmt kein Zeichen, das in einem Mehrzeichen-Symbol steckt', () => {
+    expect(nextFreeSymbol(['ab'])).toBe('c')
+  })
+
+  it('bleibt ein einzelnes Zeichen, wenn a–z und 0–9 belegt sind', () => {
+    const full = [...'abcdefghijklmnopqrstuvwxyz0123456789']
+    expect(nextFreeSymbol(full)).toBe('α')
+    expect(nextFreeSymbol([...full, ...'αβγδζηθικλμνξοπρστυφχψω'])).toHaveLength(1)
+  })
 })
 
 describe('validateSymbol', () => {
@@ -25,6 +35,14 @@ describe('validateSymbol', () => {
   it('lehnt Duplikate ab, außer beim Umbenennen auf sich selbst', () => {
     expect(validateSymbol(['a', 'b'], 'b', 'a')).not.toBeNull()
     expect(validateSymbol(['a', 'b'], 'a', 'a')).toBeNull()
+  })
+
+  it('kein Zeichen einzeln und zugleich in einem Mehrzeichen-Symbol', () => {
+    expect(validateSymbol(['a', 'b'], 'ab')).toBe('„a“ gibt es schon einzeln')
+    expect(validateSymbol(['ab'], 'b')).toBe('„b“ steckt in „ab“')
+    expect(validateSymbol(['x1'], 'x2')).toBeNull()
+    // Beim Umbenennen zählt das alte Symbol nicht mehr
+    expect(validateSymbol(['a', 'c'], 'ab', 'a')).toBeNull()
   })
 })
 

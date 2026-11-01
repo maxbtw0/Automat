@@ -42,6 +42,7 @@ describe('Alphabet-Presets', () => {
     expect(presetProblem([p('x', [])], 0)).toBe('Keine Symbole')
     expect(presetProblem([p('x', ['a', 'eps'])], 0)).toBe('ε ist kein Symbol')
     expect(presetProblem([p('x', ['a', 'b', 'a'])], 0)).toBe('„a“ doppelt')
+    expect(presetProblem([p('x', ['a', 'b', 'ab'])], 0)).toBe('„a“ einzeln und in „ab“')
   })
 
   it('fehlende Liste wird zum Standard, ungültige Einträge fallen weg', () => {
