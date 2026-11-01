@@ -8,8 +8,10 @@ interface StateNodeViewProps {
   selected: boolean
   active: boolean
   outcome?: 'accepted' | 'rejected'
-  /** Akzeptiert auch ohne Endzustand (Kellerautomat mit leerem Stack) */
+  /** Akzeptiert auch ohne Endzustand (Kellerautomat mit leerem Stack, Transduktor) */
   acceptAny?: boolean
+  /** Angezeigter Text – Standard der Name, beim Moore-Automaten „q0/1“ */
+  text?: string
   /** Kurz abdimmen (Simulation: Zustand bleibt aktiv) – Dauer in ms */
   pulseMs?: number
   onPointerDown(e: PointerEvent<SVGGElement>, state: StateNode): void
@@ -25,6 +27,7 @@ export function StateNodeView({
   active,
   outcome,
   acceptAny = false,
+  text = state.label,
   pulseMs,
   onPointerDown,
   onDoubleClick,
@@ -58,7 +61,7 @@ export function StateNodeView({
       <circle className="state-circle" r={R} />
       {state.isFinal && <circle className="state-final-ring" r={R - 5} />}
       <text className="state-label" textAnchor="middle" dominantBaseline="central">
-        {state.label}
+        {text}
       </text>
     </g>
   )

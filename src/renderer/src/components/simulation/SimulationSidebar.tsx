@@ -2,7 +2,7 @@ import { MAX_SPEED, MIN_SPEED, SPEED_STEP } from '@shared/simulationSettings'
 import { Icon } from '@/components/common/Icon'
 import { tokenizeWord } from '@/core/automaton/word'
 import { useShortcutTitle } from '@/hooks/useShortcutTitle'
-import { usesTape } from '@/model/graph'
+import { usesOutput, usesTape } from '@/model/graph'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 import type { SimulationControls, SimulationStatus } from './useSimulation'
@@ -15,12 +15,19 @@ const STATUS_LABEL: Record<SimulationStatus, string> = {
   rejected: 'Verworfen'
 }
 
+/** Transduktor: Ergebnis ist die Ausgabe – fertig übersetzt oder unterwegs abgebrochen */
+const TRANSDUCER_STATUS: Partial<Record<SimulationStatus, string>> = {
+  accepted: 'Übersetzt',
+  rejected: 'Abgebrochen'
+}
+
 
 /** Linke Randleiste: Eingabewort, Band, Steuerung, Geschwindigkeit. */
 export function SimulationSidebar({ sim }: { sim: SimulationControls }) {
   const alphabet = useEditorStore((s) => s.document.alphabet)
-  // Die Turingmaschine zeigt ihr Band groß über dem Graphen
+  // Die Turingmaschine zeigt ihr Band groß über dem Graphen, der Transduktor Ein- und Ausgabe
   const hasTape = useEditorStore((s) => usesTape(s.document.type))
+  const hasOutput = useEditorStore((s) => usesOutput(s.document.type))
   const tokens = tokenizeWord(sim.word, alphabet)
   const current = sim.steps[sim.index]
   const title = {
@@ -39,7 +46,7 @@ export function SimulationSidebar({ sim }: { sim: SimulationControls }) {
       <header className="sim-sidebar-header">
         <h1>Simulation</h1>
         <span className={classNames('sim-badge', `is-${sim.status}`)}>
-          {STATUS_LABEL[sim.status]}
+          {(hasOutput && TRANSDUCER_STATUS[sim.status]) || STATUS_LABEL[sim.status]}
         </span>
       </header>
 
@@ -61,7 +68,7 @@ export function SimulationSidebar({ sim }: { sim: SimulationControls }) {
             }
           }}
         />
-        {!hasTape && (
+        {!hasTape && !hasOutput && (
           <div className="sim-tape" aria-label="Eingabeband">
             {tokens.length === 0 ? (
               <span className={classNames('sim-cell', position >= 0 && 'is-current')}>ε</span>

@@ -3,6 +3,7 @@ import { DFA } from './dfa'
 import { NFA } from './nfa'
 import { PushdownAutomaton } from './pda'
 import { TuringMachine } from './tm'
+import { Transducer } from './transducer'
 import type { Automaton, AutomatonDefinition } from './types'
 
 /**
@@ -52,6 +53,24 @@ const definitions: Record<AutomatonType, AutomatonDefinition> = {
     name: 'TM',
     description: 'Deterministische Turingmaschine',
     create: (document) => new TuringMachine(document),
+    epsilon: false,
+    regex: false,
+    singlePath: true
+  },
+  MEALY: {
+    type: 'MEALY',
+    name: 'Mealy',
+    description: 'Mealy-Automat (Ausgabe am Übergang)',
+    create: (document) => new Transducer(document),
+    epsilon: false,
+    regex: false,
+    singlePath: true
+  },
+  MOORE: {
+    type: 'MOORE',
+    name: 'Moore',
+    description: 'Moore-Automat (Ausgabe am Zustand)',
+    create: (document) => new Transducer(document),
     epsilon: false,
     regex: false,
     singlePath: true

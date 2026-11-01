@@ -52,12 +52,17 @@ export interface SimulationStep {
   inputPosition: number
   /** Kellerautomat: Stackinhalt, oben = letztes Element */
   stack?: string[]
-  /** Kellerautomat, Turingmaschine: im letzten Schritt angewendete Regel */
+  /** Kellerautomat, Turingmaschine, Mealy-Automat: im letzten Schritt angewendete Regel */
   label?: TransitionLabel
   /** Turingmaschine: Bandinhalt */
   tape?: TapeSnapshot
   /** Turingmaschine: Zelle unter dem Kopf (0 = erstes Symbol des Eingabeworts) */
   head?: number
+  /**
+   * Transduktor: bisherige Ausgabe, ein Stück pro Schritt – `output[i]` hat Schritt i erzeugt.
+   * Moore: `output[0]` = Ausgabe des Startzustands; Mealy: `output[0]` ist leer.
+   */
+  output?: string[][]
 }
 
 export interface SimulationResult {

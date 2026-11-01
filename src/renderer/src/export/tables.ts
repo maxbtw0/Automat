@@ -1,14 +1,24 @@
-import { formatLabel, formatStack, formatStackWord, formatTape } from '@/core/automaton/labels'
+import {
+  formatLabel,
+  formatStack,
+  formatStackWord,
+  formatTape,
+  formatWord
+} from '@/core/automaton/labels'
 import { getAutomatonDefinition } from '@/core/automaton/registry'
 import type { SimulationStep } from '@/core/automaton/types'
 import {
   compareSymbols,
   findState,
   listTransitionEntries,
+  outputSettings,
+  outputsOnStates,
   sortTransitionEntries,
   stackSettings,
+  stateOutput,
   tapeSettings,
   labelSymbols,
+  usesOutput,
   usesStack,
   usesTape,
   type AlphabetKind,
@@ -30,12 +40,41 @@ export interface SimulationSnapshot {
   abortReason?: string | null
 }
 
-/** Alphabet; beim Kellerautomaten und der Turingmaschine Σ und Γ untereinander mit Spalte „Alphabet“ */
+/**
+ * Alphabet; beim Kellerautomaten und der Turingmaschine Σ und Γ untereinander mit Spalte
+ * „Alphabet“, beim Transduktor Σ und Δ.
+ */
 export function alphabetTable(document: AutomatonDocument): ExportTable {
   const usage = (symbol: string, kind: AlphabetKind): number =>
     document.graph.transitions.filter((t) =>
       t.labels.some((l) => labelSymbols(l, kind).includes(symbol))
     ).length
+  if (usesOutput(document.type)) {
+    // Moore: Ausgaben hängen an Zuständen – gezählt werden dann Zustände
+    const moore = outputsOnStates(document.type)
+    const outputUsage = (symbol: string): number =>
+      moore
+        ? document.graph.states.filter((s) => stateOutput(s).includes(symbol)).length
+        : usage(symbol, 'output')
+    const rows = [
+      ...document.alphabet.map((symbol) => ['Σ', symbol, String(usage(symbol, 'input'))]),
+      ...outputSettings(document).alphabet.map((symbol) => [
+        'Δ',
+        symbol,
+        String(outputUsage(symbol))
+      ])
+    ]
+    return {
+      title: 'Alphabet',
+      columns: [
+        { title: '#' },
+        { title: 'Alphabet' },
+        { title: 'Symbol', mono: true },
+        { title: 'Benutzt', align: 'right' }
+      ],
+      rows: rows.map((row, i) => [String(i + 1), ...row])
+    }
+  }
   if (usesTape(document.type)) {
     const tape = tapeSettings(document)
     const rows = [
@@ -132,6 +171,34 @@ export function transitionTable(document: AutomatonDocument, sorted: boolean): E
   const entries = listTransitionEntries(graph)
   const label = (id: string): string => findState(graph, id)?.label ?? '?'
   const rows = sorted ? sortTransitionEntries(graph, entries) : entries
+  if (usesOutput(document.type)) {
+    // Mealy: Ausgabe der Regel; Moore: Ausgabe des Zustands der Zeile
+    const delta = outputSettings(document).alphabet
+    const moore = outputsOnStates(document.type)
+    const stateOutputOf = (id: string): string => {
+      const state = findState(graph, id)
+      return formatWord(state ? stateOutput(state) : [], delta)
+    }
+    return {
+      title: 'Übergangstabelle',
+      columns: [
+        { title: '#' },
+        { title: 'Zustand', mono: true },
+        ...(moore ? [{ title: 'Ausgabe', mono: true }] : []),
+        { title: 'Symbol', mono: true },
+        ...(moore ? [] : [{ title: 'Ausgabe', mono: true }]),
+        { title: 'Folgezustand', mono: true }
+      ],
+      rows: rows.map((e, i) => [
+        String(i + 1),
+        label(e.from),
+        ...(moore ? [stateOutputOf(e.from)] : []),
+        e.symbol ?? '–',
+        ...(moore ? [] : [e.symbol === null ? '–' : formatWord(e.output ?? [], delta)]),
+        label(e.to)
+      ])
+    }
+  }
   if (usesStack(document.type)) {
     return {
       title: 'Übergangstabelle',
@@ -165,10 +232,21 @@ export function transitionTable(document: AutomatonDocument, sorted: boolean): E
   }
 }
 
-/** Ergebnis unter der Tabelle: „Akzeptiert“, „Verworfen“ oder der Grund des Abbruchs */
-function simulationResult(snapshot: SimulationSnapshot): TableResult | undefined {
+/**
+ * Ergebnis unter der Tabelle: „Akzeptiert“, „Verworfen“ oder der Grund des Abbruchs – beim
+ * Transduktor die Ausgabe.
+ */
+function simulationResult(
+  document: AutomatonDocument,
+  snapshot: SimulationSnapshot
+): TableResult | undefined {
   if (snapshot.abortReason) return { text: snapshot.abortReason, tone: 'rejected' }
   if (!snapshot.outcome) return undefined
+  if (usesOutput(document.type) && snapshot.outcome === 'accepted') {
+    const last = snapshot.steps[snapshot.steps.length - 1]
+    const output = formatWord((last?.output ?? []).flat(), outputSettings(document).alphabet)
+    return { text: `Ausgabe „${output}“`, tone: 'accepted' }
+  }
   const text = snapshot.outcome === 'accepted' ? 'Akzeptiert' : 'Verworfen'
   return { text, tone: snapshot.outcome }
 }
@@ -187,7 +265,30 @@ export function simulationTable(
     return markCurrent && i === snapshot.index ? 'current' : undefined
   })
   const title = `Simulation „${snapshot.word || 'ε'}“`
-  const result = simulationResult(snapshot)
+  const result = simulationResult(document, snapshot)
+  if (usesOutput(document.type)) {
+    const delta = outputSettings(document).alphabet
+    const mealy = !outputsOnStates(document.type)
+    return {
+      title,
+      result,
+      columns: [
+        { title: '#' },
+        { title: mealy ? 'Regel' : 'Gelesen', mono: true },
+        { title: 'Zustand', mono: true },
+        { title: 'Resteingabe', mono: true },
+        { title: 'Ausgabe', mono: true }
+      ],
+      rows: snapshot.steps.map((step) => [
+        String(step.index),
+        mealy && step.label ? formatLabel(step.label, delta) : (step.symbol ?? '–'),
+        formatStateSet(step.activeStateIds.map(label), true),
+        step.remaining || 'ε',
+        formatWord((step.output ?? []).flat(), delta)
+      ]),
+      rowTones
+    }
+  }
   if (usesTape(document.type)) {
     return {
       title,

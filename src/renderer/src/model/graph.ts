@@ -26,6 +26,19 @@ export function usesTape(type: AutomatonType): boolean {
   return type === 'TM'
 }
 
+/**
+ * Transduktoren (Mealy, Moore): erzeugen beim Lesen ein Ausgabewort über dem Ausgabealphabet Δ.
+ * Sie haben keine Endzustände – das Ergebnis ist die Ausgabe.
+ */
+export function usesOutput(type: AutomatonType): boolean {
+  return type === 'MEALY' || type === 'MOORE'
+}
+
+/** Moore-Automat: die Ausgabe hängt am Zustand statt am Übergang. */
+export function outputsOnStates(type: AutomatonType): boolean {
+  return type === 'MOORE'
+}
+
 export interface StateNode {
   id: StateId
   label: string
@@ -34,13 +47,15 @@ export interface StateNode {
   y: number
   isStart: boolean
   isFinal: boolean
+  /** Moore-Automat: Ausgabe λ(z) beim Betreten des Zustands – fehlt = ε */
+  output?: string[]
 }
 
 
 /**
  * Eine Regel an einem Übergang. Endliche Automaten nutzen nur `read`, Kellerautomaten
  * zusätzlich `pop` und `push` – Schreibweise `a, Z → AZ` –, Turingmaschinen `write` und
- * `move` – Schreibweise `a → b, R`.
+ * `move` – Schreibweise `a → b, R` –, Mealy-Automaten `output` – Schreibweise `a/xy`.
  */
 export interface TransitionLabel {
   /** Gelesenes Eingabesymbol (Turingmaschine: Bandsymbol unter dem Kopf) – ε = ohne zu lesen */
@@ -53,6 +68,8 @@ export interface TransitionLabel {
   write?: string
   /** Turingmaschine: Kopfbewegung danach */
   move?: TapeMove
+  /** Mealy-Automat: Ausgabewort beim Schalten – [] = ε */
+  output?: string[]
 }
 
 export interface TransitionEdge {
@@ -87,6 +104,12 @@ export interface TapeSettings {
   blank: string
 }
 
+/** Zusatzangaben der Transduktoren */
+export interface OutputSettings {
+  /** Ausgabealphabet Δ */
+  alphabet: string[]
+}
+
 /** Der Name des Automaten ist kein Teil des Dokuments – er kommt vom Dateinamen. */
 export interface AutomatonDocument {
   type: AutomatonType
@@ -96,6 +119,8 @@ export interface AutomatonDocument {
   stack?: StackSettings
   /** Nur bei der Turingmaschine */
   tape?: TapeSettings
+  /** Nur bei Transduktoren (Mealy, Moore) */
+  output?: OutputSettings
   graph: EditorGraph
 }
 
@@ -135,6 +160,31 @@ export function acceptsByEmptyStack(document: AutomatonDocument): boolean {
   return usesStack(document.type) && stackSettings(document).acceptance === 'empty'
 }
 
+/**
+ * Endet ein erfolgreicher Lauf in jedem Zustand (Kellerautomat mit leerem Stack, Transduktor)?
+ * Dann färbt die Simulation am Ende den aktiven Zustand grün, und Endzustände zählen nicht.
+ */
+export function endsWithoutFinal(document: AutomatonDocument): boolean {
+  return acceptsByEmptyStack(document) || usesOutput(document.type)
+}
+
+export function createOutputSettings(): OutputSettings {
+  return { alphabet: [] }
+}
+
+/** Ohne Ausgabeangaben: immer dasselbe Objekt, damit Store-Selektoren stabil bleiben */
+const NO_OUTPUT: OutputSettings = Object.freeze({ alphabet: Object.freeze([]) as unknown as string[] })
+
+/** Ausgabeangaben des Dokuments – bei Dokumenten ohne Ausgabe ein leeres Δ. */
+export function outputSettings(document: AutomatonDocument): OutputSettings {
+  return document.output ?? NO_OUTPUT
+}
+
+/** Moore-Ausgabe eines Zustands – ohne Angabe ε */
+export function stateOutput(state: StateNode): string[] {
+  return state.output ?? []
+}
+
 /** Übliches Blank der Turingmaschine */
 export const BLANK = '#'
 /**
@@ -169,6 +219,7 @@ export function createEmptyDocument(
     alphabet: [...alphabet],
     ...(usesStack(type) ? { stack: createStackSettings() } : {}),
     ...(usesTape(type) ? { tape: createTapeSettings(alphabet) } : {}),
+    ...(usesOutput(type) ? { output: createOutputSettings() } : {}),
     graph: { states: [], transitions: [] }
   }
 }
@@ -247,6 +298,8 @@ export function parseSymbols(input: string): string[] {
 const INPUT_CANDIDATES = [...'abcdefghijklmnopqrstuvwxyz0123456789']
 /** Stacksymbole üblicherweise groß: A, B, …, Z */
 export const STACK_CANDIDATES = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789']
+/** Ausgaben üblicherweise Ziffern: 0, 1, …, 9, dann a, b, … */
+export const OUTPUT_CANDIDATES = [...'0123456789abcdefghijklmnopqrstuvwxyz']
 
 /** Nächstes freies Symbol: a, b, …, z, dann 0, …, 9, dann x1, x2, … */
 export function nextFreeSymbol(alphabet: string[], candidates = INPUT_CANDIDATES): string {
@@ -293,13 +346,14 @@ export function edgeSymbols(edge: TransitionEdge): string[] {
   return [...new Set(edge.labels.map((l) => l.read))]
 }
 
-/** Welches Alphabet: Eingabealphabet Σ, Stackalphabet Γ oder Bandalphabet Γ */
-export type AlphabetKind = 'input' | 'stack' | 'tape'
+/** Welches Alphabet: Eingabealphabet Σ, Stackalphabet Γ, Bandalphabet Γ oder Ausgabealphabet Δ */
+export type AlphabetKind = 'input' | 'stack' | 'tape' | 'output'
 
 /** Symbole, die eine Regel im jeweiligen Alphabet benutzt (pop ε zählt als ε) */
 export function labelSymbols(label: TransitionLabel, kind: AlphabetKind): string[] {
   if (kind === 'input') return [label.read]
   if (kind === 'tape') return [label.read, ...(label.write === undefined ? [] : [label.write])]
+  if (kind === 'output') return label.output ?? []
   return [label.pop ?? EPSILON, ...(label.push ?? [])]
 }
 
@@ -310,6 +364,7 @@ export function readsSymbol(edge: TransitionEdge, symbol: string): boolean {
 
 /** Eindeutiger Schlüssel einer Regel – zwei Regeln mit gleichem Schlüssel sind gleich. */
 export function labelKey(label: TransitionLabel): string {
+  if (label.output !== undefined) return `${label.read}␟/${label.output.join(' ')}`
   if (label.write !== undefined) return `${label.read}␟${label.write}␟${label.move ?? ''}`
   if (label.pop === undefined) return label.read
   return `${label.read}␟${label.pop}␟${(label.push ?? []).join(' ')}`
@@ -325,7 +380,7 @@ const hasLabel = (labels: TransitionLabel[], label: TransitionLabel): boolean =>
 
 /**
  * Eine Zeile der Übergangstabelle. `symbol: null` = Übergang ohne Regel.
- * Beim Kellerautomaten kommen `pop` und `push` dazu.
+ * Beim Kellerautomaten kommen `pop` und `push` dazu, beim Mealy-Automaten `output`.
  */
 export interface TransitionEntry {
   from: StateId
@@ -333,16 +388,19 @@ export interface TransitionEntry {
   to: StateId
   pop?: string
   push?: string[]
+  output?: string[]
 }
 
 /** Die Regel einer Zeile – `null` bei einem Übergang ohne Regel. */
 export function entryLabel(entry: TransitionEntry): TransitionLabel | null {
   if (entry.symbol === null) return null
+  if (entry.output !== undefined) return { read: entry.symbol, output: entry.output }
   if (entry.pop === undefined) return { read: entry.symbol }
   return { read: entry.symbol, pop: entry.pop, push: entry.push ?? [] }
 }
 
 function labelEntry(from: StateId, label: TransitionLabel, to: StateId): TransitionEntry {
+  if (label.output !== undefined) return { from, symbol: label.read, to, output: label.output }
   if (label.pop === undefined) return { from, symbol: label.read, to }
   return { from, symbol: label.read, to, pop: label.pop, push: label.push ?? [] }
 }
@@ -381,6 +439,7 @@ export function sortTransitionEntries(
       compareSymbols(a.symbol ?? '', b.symbol ?? '') ||
       compareSymbols(a.pop ?? '', b.pop ?? '') ||
       compareSymbols((a.push ?? []).join(' '), (b.push ?? []).join(' ')) ||
+      compareSymbols((a.output ?? []).join(' '), (b.output ?? []).join(' ')) ||
       compareSymbols(label(a.to), label(b.to))
   )
 }

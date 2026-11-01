@@ -1,0 +1,54 @@
+{
+  "format": "automat",
+  "version": 2,
+  "document": {
+    "type": "MEALY",
+    "alphabet": ["0", "1"],
+    "output": { "alphabet": ["0", "1"] },
+    "graph": {
+      "states": [
+        { "id": "s_start", "label": "q0", "x": 140, "y": 240, "isStart": true, "isFinal": false },
+        { "id": "s_null", "label": "q1", "x": 420, "y": 120, "isStart": false, "isFinal": false },
+        { "id": "s_eins", "label": "q2", "x": 420, "y": 360, "isStart": false, "isFinal": false }
+      ],
+      "transitions": [
+        {
+          "id": "t_start_null",
+          "from": "s_start",
+          "to": "s_null",
+          "labels": [{ "read": "0", "output": ["0"] }]
+        },
+        {
+          "id": "t_start_eins",
+          "from": "s_start",
+          "to": "s_eins",
+          "labels": [{ "read": "1", "output": ["0"] }]
+        },
+        {
+          "id": "t_null_null",
+          "from": "s_null",
+          "to": "s_null",
+          "labels": [{ "read": "0", "output": ["0"] }]
+        },
+        {
+          "id": "t_null_eins",
+          "from": "s_null",
+          "to": "s_eins",
+          "labels": [{ "read": "1", "output": ["1"] }]
+        },
+        {
+          "id": "t_eins_eins",
+          "from": "s_eins",
+          "to": "s_eins",
+          "labels": [{ "read": "1", "output": ["0"] }]
+        },
+        {
+          "id": "t_eins_null",
+          "from": "s_eins",
+          "to": "s_null",
+          "labels": [{ "read": "0", "output": ["1"] }]
+        }
+      ]
+    }
+  }
+}

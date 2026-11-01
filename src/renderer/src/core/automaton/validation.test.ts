@@ -4,7 +4,15 @@ import { createAutomaton } from './registry'
 import { buildDocument } from './testing'
 
 describe('Prüfung: Übergänge zu fehlenden Zuständen', () => {
-  const labelFor = { DFA: 'a', NFA: 'a', DPDA: 'a, # → #', NPDA: 'a, # → #', TM: 'a → a, R' }
+  const labelFor = {
+    DFA: 'a',
+    NFA: 'a',
+    DPDA: 'a, # → #',
+    NPDA: 'a, # → #',
+    TM: 'a → a, R',
+    MEALY: 'a/',
+    MOORE: 'a'
+  }
 
   it.each(AUTOMATON_TYPES)('%s meldet fehlendes Ziel und fehlende Quelle als Fehler', (type) => {
     const doc = buildDocument(type, ['a'], { start: 'q0', finals: ['q0'] }, [

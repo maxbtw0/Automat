@@ -12,6 +12,7 @@ import {
   columnSvg,
   graphSvg,
   measureText,
+  outputFigureSvg,
   pageSvg,
   paragraphSvg,
   rowSvg,
@@ -366,5 +367,90 @@ describe('Bildgröße nach Textbreite', () => {
     const label = image.svg.match(/<rect x="([-\d.]+)" y="[\d.]+" width="([\d.]+)" height="20"/)
     expect(Number(label?.[1])).toBeGreaterThanOrEqual(0)
     expect(Number(label?.[1]) + Number(label?.[2])).toBeLessThanOrEqual(image.width)
+  })
+})
+
+describe('Export Transduktor', () => {
+  const mealy = buildDocument('MEALY', ['a', 'b'], { start: 'q0', output: ['0', '1'] }, [
+    ['q0', 'a/0, b/11', 'q1'],
+    ['q1', 'a/ε', 'q0']
+  ])
+  const moore = buildDocument(
+    'MOORE',
+    ['a'],
+    { start: 'q0', output: ['0', '1'], outputs: { q0: '0', q1: '1' } },
+    [
+      ['q0', 'a', 'q1'],
+      ['q1', 'a', 'q0']
+    ]
+  )
+
+  it('Graph zeigt Mealy-Regeln „a/0“ und Moore-Zustände „q0/0“', () => {
+    expect(graphSvg(mealy).svg).toContain('a/0, b/11')
+    expect(graphSvg(moore).svg).toContain('>q0/0<')
+  })
+
+  it('Alphabet mit Σ und Δ', () => {
+    expect(alphabetTable(moore).rows).toEqual([
+      ['1', 'Σ', 'a', '2'],
+      ['2', 'Δ', '0', '1'],
+      ['3', 'Δ', '1', '1']
+    ])
+  })
+
+  it('Übergangstabelle: Mealy mit Ausgabe der Regel, Moore mit Ausgabe des Zustands', () => {
+    const mealyTable = transitionTable(mealy, false)
+    expect(mealyTable.columns.map((c) => c.title)).toEqual([
+      '#',
+      'Zustand',
+      'Symbol',
+      'Ausgabe',
+      'Folgezustand'
+    ])
+    expect(mealyTable.rows).toEqual([
+      ['1', 'q0', 'a', '0', 'q1'],
+      ['2', 'q0', 'b', '11', 'q1'],
+      ['3', 'q1', 'a', 'ε', 'q0']
+    ])
+    expect(transitionTable(moore, false).rows).toEqual([
+      ['1', 'q0', '0', 'a', 'q1'],
+      ['2', 'q1', '1', 'a', 'q0']
+    ])
+  })
+
+  it('Simulationstabelle mit Ausgabe, Ergebnis ist die Ausgabe', () => {
+    const sim = createAutomaton(mealy).createSimulator('ba')
+    const steps = [sim.reset(), ...sim.run().steps]
+    const snapshot: SimulationSnapshot = { word: 'ba', steps, index: 2, outcome: 'accepted' }
+    const table = simulationTable(mealy, snapshot)
+    expect(table.columns.map((c) => c.title)).toEqual([
+      '#',
+      'Regel',
+      'Zustand',
+      'Resteingabe',
+      'Ausgabe'
+    ])
+    expect(table.rows).toEqual([
+      ['0', '–', 'q0', 'ba', 'ε'],
+      ['1', 'b/11', 'q1', 'a', '11'],
+      ['2', 'a/ε', 'q0', 'ε', '11']
+    ])
+    expect(table.result).toEqual({ text: 'Ausgabe „11“', tone: 'accepted' })
+  })
+
+  it('Ausgabe-Bild: eine Spalte pro Eingabesymbol, Breite nach dem endgültigen Stück', () => {
+    const columns = [
+      { input: null, output: '0' },
+      { input: 'a', output: '1' },
+      { input: 'a', output: null }
+    ]
+    const image = outputFigureSvg(columns, { current: 1, word: '01' })
+    expect(image.svg).toContain('>Start<')
+    expect(image.svg.match(/<rect x=/g)).toHaveLength(2 * 3)
+    const reserved = outputFigureSvg(
+      columns.map((c) => ({ ...c, reserve: '0000000' })),
+      { current: 1, word: '01' }
+    )
+    expect(reserved.width).toBeGreaterThan(image.width)
   })
 })

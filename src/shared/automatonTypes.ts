@@ -1,5 +1,5 @@
 /** Alle Automatentypen, die der Editor kennt. Neue Typen hier ergänzen. */
-export const AUTOMATON_TYPES = ['DFA', 'NFA', 'DPDA', 'NPDA', 'TM'] as const
+export const AUTOMATON_TYPES = ['DFA', 'NFA', 'DPDA', 'NPDA', 'TM', 'MEALY', 'MOORE'] as const
 export type AutomatonType = (typeof AUTOMATON_TYPES)[number]
 
 /** Akzeptanz des Kellerautomaten: Endzustand oder leerer Stack */

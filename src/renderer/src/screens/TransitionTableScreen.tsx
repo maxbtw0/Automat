@@ -1,8 +1,15 @@
 import { useMemo, useState } from 'react'
 import { ComboInput } from '@/components/common/ComboInput'
+import { CommitInput } from '@/components/common/CommitInput'
 import { TuringTable } from '@/components/table/TuringTable'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
-import { formatStackWord, parseStackWord, pushSuggestions } from '@/core/automaton/labels'
+import {
+  formatStackWord,
+  formatWord,
+  parseStackWord,
+  parseWord,
+  pushSuggestions
+} from '@/core/automaton/labels'
 import { getAutomatonDefinition } from '@/core/automaton/registry'
 import { TRANSITION_TABLE_TOOLS, type TransitionTableTool } from '@/editor/transitionTableTools'
 import {
@@ -12,6 +19,7 @@ import {
   normalizeSymbol,
   listTransitionEntries,
   sortTransitionEntries,
+  stateOutput,
   usesStack,
   usesTape,
   type EditorGraph,
@@ -38,14 +46,24 @@ function TransitionList() {
   const alphabet = useEditorStore((s) => s.document.alphabet)
   const type = useEditorStore((s) => s.document.type)
   const stackAlphabet = useEditorStore((s) => s.document.stack?.alphabet)
+  const outputAlphabet = useEditorStore((s) => s.document.output?.alphabet)
   /** Kellerautomat: zusätzliche Spalten Stacksymbol (pop) und Push */
   const hasStack = usesStack(type)
   const gamma = hasStack ? (stackAlphabet ?? []) : []
+  /** Mealy: Spalte Ausgabe der Regel; Moore: Spalte Ausgabe des Zustands */
+  const mealy = type === 'MEALY'
+  const moore = type === 'MOORE'
+  const delta = outputAlphabet ?? []
   const allowsEpsilon = getAutomatonDefinition(type).epsilon
   const symbolOptions = allowsEpsilon ? [...alphabet, EPSILON] : alphabet
   const sorted = useScreenStore((s) => s.transitionTableSorted)
-  const { addTransitionEntry, replaceTransitionEntry, removeTransitionEntry, addStateWithEntry } =
-    useEditorStore.getState()
+  const {
+    addTransitionEntry,
+    replaceTransitionEntry,
+    removeTransitionEntry,
+    addStateWithEntry,
+    updateState
+  } = useEditorStore.getState()
 
   /** Ausgewählte Zeile (über entryKey) – darauf wirkt „Löschen“, „Neu“ startet bei ihrem Zustand. */
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -56,12 +74,14 @@ function TransitionList() {
 
   /**
    * Neue Zeile für (Zustand, Symbol[, Stacksymbol]) – beim Kellerautomaten bleibt der Stack
-   * unverändert (Push = Stacksymbol).
+   * unverändert (Push = Stacksymbol), der Mealy-Automat gibt ε aus.
    */
   const newEntry = (from: string, symbol: string, pop?: string): TransitionEntry =>
-    pop === undefined
-      ? { from, symbol, to: from }
-      : { from, symbol, to: from, pop, push: [pop] }
+    pop !== undefined
+      ? { from, symbol, to: from, pop, push: [pop] }
+      : mealy
+        ? { from, symbol, to: from, output: [] }
+        : { from, symbol, to: from }
 
   /** Erste Kombination ohne Zeile – ab dem Zustand der ausgewählten Zeile. Ziel: Schleife. */
   const findFreeEntry = (): TransitionEntry | null => {
@@ -156,10 +176,29 @@ function TransitionList() {
       setError(`„${symbol}“ nicht im Alphabet`)
       return false
     }
-    // Übergang ohne Regel bekommt beim Kellerautomaten eine Regel, die den Stack nicht ändert
+    // Übergang ohne Regel bekommt beim Kellerautomaten eine Regel, die den Stack nicht ändert,
+    // beim Mealy-Automaten eine mit Ausgabe ε
     const needsStack = hasStack && entry.pop === undefined
     const pop = gamma[0] ?? STACK_BOTTOM
-    handleChange(entry, needsStack ? { symbol, pop, push: [pop] } : { symbol })
+    const output = mealy && entry.output === undefined ? { output: [] } : {}
+    handleChange(entry, needsStack ? { symbol, pop, push: [pop] } : { symbol, ...output })
+    return true
+  }
+
+  /** Ausgabewort aus Δ*, leer = ε – Mealy an der Regel, Moore am Zustand der Zeile */
+  const handleOutputCommit = (entry: TransitionEntry, input: string): boolean => {
+    const output = parseWord(input, delta)
+    const unknown = output.find((s) => !delta.includes(s))
+    if (unknown !== undefined) {
+      setError(`„${unknown}“ nicht im Ausgabealphabet`)
+      return false
+    }
+    if (moore) {
+      setError(null)
+      updateState(entry.from, { output })
+    } else {
+      handleChange(entry, { output })
+    }
     return true
   }
 
@@ -257,7 +296,21 @@ function TransitionList() {
     />
   )
 
-  const columns = hasStack ? 6 : 4
+  const outputInput = (entry: TransitionEntry) => {
+    const state = graph.states.find((s) => s.id === entry.from)
+    const output = moore ? (state ? stateOutput(state) : []) : (entry.output ?? [])
+    return (
+      <CommitInput
+        className="is-mono"
+        aria-label="Ausgabe"
+        value={formatWord(output, delta)}
+        onFocus={focusRow(entry)}
+        onCommit={(value) => handleOutputCommit(entry, value)}
+      />
+    )
+  }
+
+  const columns = hasStack ? 6 : mealy || moore ? 5 : 4
 
   return (
     <div className="table-screen">
@@ -275,7 +328,9 @@ function TransitionList() {
             <tr>
               <th className="is-index">#</th>
               <th>Zustand</th>
+              {moore && <th>Ausgabe</th>}
               <th>{hasStack ? 'Eingabe' : 'Symbol'}</th>
+              {mealy && <th>Ausgabe</th>}
               {hasStack && <th>Top of Stack</th>}
               {hasStack && <th>Push</th>}
               <th>Folgezustand</th>
@@ -301,7 +356,9 @@ function TransitionList() {
                 >
                   <td className="is-index">{index + 1}</td>
                   <td>{stateInput(entry, 'from', 'Zustand')}</td>
+                  {moore && <td>{outputInput(entry)}</td>}
                   <td>{symbolInput(entry)}</td>
+                  {mealy && <td>{entry.symbol === null ? null : outputInput(entry)}</td>}
                   {hasStack && <td>{entry.symbol === null ? null : popInput(entry)}</td>}
                   {hasStack && <td>{entry.symbol === null ? null : pushInput(entry)}</td>}
                   <td>{stateInput(entry, 'to', 'Folgezustand')}</td>

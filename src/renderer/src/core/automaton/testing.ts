@@ -3,13 +3,14 @@ import {
   createStackSettings,
   createTapeSettings,
   symbolLabels,
+  usesOutput,
   usesStack,
   usesTape,
   type AutomatonDocument,
   type AutomatonType,
   type StackSettings
 } from '@/model/graph'
-import { parseLabels } from './labels'
+import { parseLabels, parseWord } from './labels'
 
 /**
  * Baut Testdokumente kompakt auf (nur für Tests):
@@ -32,6 +33,13 @@ import { parseLabels } from './labels'
  *     ['q0', '# → #, N', 'q1']
  *   ])
  *
+ * Beim Mealy-Automaten Regeln „a/0, b/1“ über Δ = `output`, beim Moore-Automaten Symbole wie beim
+ * DEA und die Zustandsausgaben in `outputs`:
+ *
+ *   buildDocument('MOORE', ['a'], { start: 'q0', output: ['0', '1'], outputs: { q1: '1' } }, [
+ *     ['q0', 'a', 'q1']
+ *   ])
+ *
  * Zustands-IDs = Bezeichnungen. Zustände werden aus Start, Endzuständen und Übergängen gesammelt.
  */
 export function buildDocument(
@@ -44,7 +52,9 @@ export function buildDocument(
     stack,
     stackStart,
     acceptance,
-    tape
+    tape,
+    output,
+    outputs = {}
   }: {
     start?: string
     finals?: string[]
@@ -55,6 +65,10 @@ export function buildDocument(
     acceptance?: StackSettings['acceptance']
     /** Turingmaschine: weitere Bandsymbole außer Σ und # */
     tape?: string[]
+    /** Transduktor: Ausgabealphabet Δ */
+    output?: string[]
+    /** Moore-Automat: Ausgabe je Zustand als Wort, z. B. { q1: '01' } */
+    outputs?: Record<string, string>
   },
   transitions: [from: string, labels: string, to: string][]
 ): AutomatonDocument {
@@ -75,20 +89,24 @@ export function buildDocument(
     }
   }
   if (usesTape(type)) doc.tape = createTapeSettings([...alphabet, ...(tape ?? [])])
-  doc.graph.states = [...labels].map((label, i) => ({
-    id: label,
-    label,
-    x: i * 100,
-    y: 0,
-    isStart: label === start,
-    isFinal: finals.includes(label)
-  }))
+  if (usesOutput(type)) doc.output = { alphabet: output ?? [] }
+  doc.graph.states = [...labels, ...Object.keys(outputs)]
+    .filter((label, i, all) => all.indexOf(label) === i)
+    .map((label, i) => ({
+      id: label,
+      label,
+      x: i * 100,
+      y: 0,
+      isStart: label === start,
+      isFinal: finals.includes(label),
+      ...(type === 'MOORE' ? { output: parseWord(outputs[label] ?? '', output ?? []) } : {})
+    }))
   doc.graph.transitions = transitions.map(([from, text, to], i) => ({
     id: `t${i}`,
     from,
     to,
     labels:
-      usesStack(type) || usesTape(type)
+      usesStack(type) || usesTape(type) || type === 'MEALY'
         ? parsedLabels(text, doc)
         : symbolLabels(text.split(',').filter(Boolean))
   }))

@@ -6,13 +6,18 @@ import {
   labelKey,
   normalizeSymbol,
   normalizeTapeSymbol,
+  outputSettings,
+  outputsOnStates,
   parseSymbols,
   stackSettings,
+  stateOutput,
   symbolLabels,
   tapeSettings,
+  usesOutput,
   usesStack,
   usesTape,
   type AutomatonDocument,
+  type StateNode,
   type TapeMove,
   type TransitionLabel
 } from '@/model/graph'
@@ -25,12 +30,13 @@ import { tokenizeWord } from './word'
  *   endlicher Automat:  a, b                  (Symbole durch Komma getrennt)
  *   Kellerautomat:      a, # → A#; b, A → ε   (Regeln durch Semikolon getrennt)
  *   Turingmaschine:     a → X, R; # → #, L    (Regeln durch Semikolon getrennt)
+ *   Mealy-Automat:      a/0, b/11             (Regeln durch Komma getrennt, Ausgabe leer = ε)
  *
  * Stackregel `a, Z → AZ`: lies a, nimm Z vom Stack, lege AZ ab (A liegt danach oben).
  * Turingregel `a → X, R`: lies a unter dem Kopf, schreibe X, gehe nach rechts (L, R, N).
  * Beim Eingeben geht statt → auch -> oder /, ε auch als „eps“ oder leer, das Blank auch als „_“.
  * Turingregeln gehen auch kurz ohne Pfeil: „a X R“ (Bewegung auch klein), Stackregeln ebenso:
- * „a Z AZ“ oder „a, Z, AZ“ (Eingabe, Top of Stack, Push).
+ * „a Z AZ“ oder „a, Z, AZ“ (Eingabe, Top of Stack, Push), Mealy-Regeln als „a 0“.
  */
 
 /** Stackregel mit allen Feldern */
@@ -86,8 +92,36 @@ export function formatStack(stack: string[], stackAlphabet?: string[]): string {
   return formatStackWord([...stack].reverse(), stackAlphabet)
 }
 
-/** Eine Regel als Text – Γ wie bei `formatStackWord`, damit das Push-Wort eindeutig bleibt. */
+/**
+ * Wort aus Symbolen, z. B. die Ausgabe eines Transduktors: „01“, leer „ε“, Mehrzeichen-Symbole
+ * mit Leerzeichen getrennt. Δ wie Γ bei `formatStackWord`.
+ */
+export const formatWord = formatStackWord
+
+/** Wort aus Text: „01“, „x1 x2“, „ε“/„“ → []. Längstes Symbol aus `alphabet` zuerst. */
+export const parseWord = parseStackWord
+
+/** Moore-Automat: Zustand mit Ausgabe wie im Lehrbuch „q0/1“ – sonst nur der Name. */
+export function stateText(state: StateNode, document: AutomatonDocument): string {
+  if (!outputsOnStates(document.type)) return state.label
+  return `${state.label}/${formatWord(stateOutput(state), outputSettings(document).alphabet)}`
+}
+
+/**
+ * Alphabet, mit dem Wörter auf der rechten Seite einer Regel formatiert werden: Γ beim
+ * Kellerautomaten (Push), Δ beim Mealy-Automaten (Ausgabe).
+ */
+export function labelWordAlphabet(document: AutomatonDocument): string[] | undefined {
+  if (usesOutput(document.type)) return outputSettings(document).alphabet
+  return document.stack?.alphabet
+}
+
+/**
+ * Eine Regel als Text – Γ bzw. Δ wie bei `formatStackWord`, damit das Push- bzw. Ausgabewort
+ * eindeutig bleibt.
+ */
 export function formatLabel(label: TransitionLabel, stackAlphabet?: string[]): string {
+  if (label.output !== undefined) return `${label.read}/${formatWord(label.output, stackAlphabet)}`
   if (isTuringLabel(label)) {
     const { read, write, move } = asTuring(label)
     return `${read} → ${write}, ${move}`
@@ -96,13 +130,17 @@ export function formatLabel(label: TransitionLabel, stackAlphabet?: string[]): s
   return `${label.read}, ${label.pop} → ${formatStackWord(label.push ?? [], stackAlphabet)}`
 }
 
+/** Regeln, die in eine Zeile passen: reine Symbole (endliche Automaten) und Mealy-Regeln „a/0“ */
 const isSymbolOnly = (labels: TransitionLabel[]): boolean =>
   labels.every((l) => l.pop === undefined && !isTuringLabel(l))
 
-/** Zeilen der Beschriftung im Graphen: Symbole in einer Zeile, Stackregeln je eine Zeile. */
+/**
+ * Zeilen der Beschriftung im Graphen: Symbole und Mealy-Regeln in einer Zeile, Stack- und
+ * Bandregeln je eine Zeile.
+ */
 export function labelLines(labels: TransitionLabel[], stackAlphabet?: string[]): string[] {
   if (labels.length === 0) return []
-  if (isSymbolOnly(labels)) return [labels.map((l) => l.read).join(', ')]
+  if (isSymbolOnly(labels)) return [labels.map((l) => formatLabel(l, stackAlphabet)).join(', ')]
   return labels.map((l) => formatLabel(l, stackAlphabet))
 }
 
@@ -227,6 +265,33 @@ export function nextTuringLabel(
   return read === undefined ? null : { read, write: read, move: documentDefaults().tapeMove }
 }
 
+const MEALY_RULE = /^([^→/]*?)(?:→|->|\/)(.*)$/
+
+/**
+ * Eine Mealy-Regel „a/01“ (auch „a → 01“) oder kurz „a 01“ – lies a, gib 01 aus. Ohne Ausgabe
+ * („a“, „a/“) ist die Ausgabe ε. `null`, wenn der Text keine Regel ist.
+ */
+export function parseMealyRule(text: string, outputAlphabet: string[]): TransitionLabel | null {
+  const match = MEALY_RULE.exec(text.trim())
+  const parts = text.trim().split(/\s+/)
+  const [readText, outputText] = match ? [match[1], match[2]] : [parts[0], parts.slice(1).join(' ')]
+  const read = normalizeSymbol(readText)
+  if (read === '' || /\s/.test(read)) return null
+  return { read, output: parseWord(outputText, outputAlphabet) }
+}
+
+/**
+ * Neue Mealy-Regel für einen Zustand: das erste Symbol aus Σ, das der Zustand noch nicht liest,
+ * mit Ausgabe ε. `null`, wenn alle belegt sind.
+ */
+export function nextMealyLabel(
+  stateRules: TransitionLabel[],
+  alphabet: string[]
+): TransitionLabel | null {
+  const read = alphabet.find((s) => !stateRules.some((l) => l.read === s))
+  return read === undefined ? null : { read, output: [] }
+}
+
 /** Bandinhalt mit Kopf in eckigen Klammern: „Xa[a]bb“ (Mehrzeichen-Symbole mit Leerzeichen). */
 export function formatTape(tape: TapeSnapshot, head: number): string {
   const separator = tape.symbols.some((s) => s.length > 1) ? ' ' : ''
@@ -237,6 +302,7 @@ export type LabelParseResult = { labels: TransitionLabel[] } | { error: string }
 
 /** Eingegebene Beschriftung → Regeln, passend zum Typ des Dokuments (ohne Duplikate). */
 export function parseLabels(text: string, document: AutomatonDocument): LabelParseResult {
+  if (document.type === 'MEALY') return parseMealyLabels(text, document)
   const tape = usesTape(document.type)
   if (!tape && !usesStack(document.type)) return { labels: symbolLabels(parseSymbols(text)) }
   const stackAlphabet = stackSettings(document).alphabet
@@ -250,6 +316,18 @@ export function parseLabels(text: string, document: AutomatonDocument): LabelPar
     }
     // Kellerautomat: jede Regel nimmt ein Symbol vom Stack
     if (!tape && label.pop === EPSILON) return { error: `„${rule}“: Top of Stack fehlt` }
+    if (!labels.some((l) => labelKey(l) === labelKey(label))) labels.push(label)
+  }
+  return { labels }
+}
+
+/** Mealy-Regeln, getrennt durch Komma, Semikolon oder Zeilenumbruch: „a/0, b/11“ */
+function parseMealyLabels(text: string, document: AutomatonDocument): LabelParseResult {
+  const delta = outputSettings(document).alphabet
+  const labels: TransitionLabel[] = []
+  for (const rule of text.split(/[,;\n]/).map((r) => r.trim()).filter(Boolean)) {
+    const label = parseMealyRule(rule, delta)
+    if (!label) return { error: `„${rule}“ ist keine Mealy-Regel (a/0)` }
     if (!labels.some((l) => labelKey(l) === labelKey(label))) labels.push(label)
   }
   return { labels }

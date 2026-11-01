@@ -1,9 +1,13 @@
 import { asPushdown } from '@/core/automaton/labels'
 import {
   EPSILON,
+  createOutputSettings,
   createStackSettings,
   createTapeSettings,
+  outputsOnStates,
+  stateOutput,
   symbolLabels,
+  usesOutput,
   usesStack,
   usesTape,
   type AutomatonDocument,
@@ -38,6 +42,20 @@ export function hasTapeOperations(document: AutomatonDocument): boolean {
   return usesTape(document.type) && document.graph.transitions.some((t) => t.labels.length > 0)
 }
 
+/** Gibt der Transduktor irgendwo etwas aus? Beim Wechsel zu einem Akzeptor geht das verloren. */
+export function hasOutputs(document: AutomatonDocument): boolean {
+  if (!usesOutput(document.type)) return false
+  if (outputsOnStates(document.type)) {
+    return document.graph.states.some((s) => stateOutput(s).length > 0)
+  }
+  return document.graph.transitions.some((t) => t.labels.some((l) => (l.output ?? []).length > 0))
+}
+
+/** Hat der Akzeptor Endzustände? Transduktoren haben keine. */
+export function hasFinalStates(document: AutomatonDocument): boolean {
+  return !usesOutput(document.type) && document.graph.states.some((s) => s.isFinal)
+}
+
 /** Gelesene Symbole ohne Duplikate – optional nur die aus `allowed` */
 const readSymbols = (labels: TransitionLabel[], allowed?: string[]): string[] => [
   ...new Set(labels.map((l) => l.read).filter((r) => !allowed || allowed.includes(r)))
@@ -52,6 +70,9 @@ const readSymbols = (labels: TransitionLabel[], allowed?: string[]): string[] =>
  * - → Turingmaschine: `a` wird `a → a, R` (lesen und weiterrücken), ε-Regeln entfallen,
  *   Bandalphabet Γ = Σ ∪ {#}.
  * - Turingmaschine → andere: nur gelesene Symbole aus Σ bleiben, das Bandalphabet entfällt.
+ * - → Transduktor: nur gelesene Symbole aus Σ bleiben (ohne ε), jede Regel gibt ε aus,
+ *   Endzustände entfallen. Mealy ↔ Moore ohne Umwandlung: die Ausgaben entfallen.
+ * - Transduktor → Akzeptor: die Ausgaben und Δ entfallen.
  * - sonst (DEA ↔ NEA, DKA ↔ NKA) ändert sich nur der Typ.
  */
 export function changeDocumentType(
@@ -59,6 +80,8 @@ export function changeDocumentType(
   type: AutomatonType
 ): AutomatonDocument {
   if (document.type === type) return document
+  if (usesOutput(type)) return toTransducer(document, type)
+  if (usesOutput(document.type)) return changeDocumentType(withoutOutputs(document), type)
   if (usesTape(type)) return toTuringMachine(document, type)
   if (usesTape(document.type)) return fromTuringMachine(document, type)
   const fromStack = usesStack(document.type)
@@ -109,5 +132,42 @@ function fromTuringMachine(document: AutomatonDocument, type: AutomatonType): Au
       const reads = readSymbols(labels, alphabet)
       return stack ? keepStackLabels(reads, stack.alphabet) : symbolLabels(reads)
     })
+  }
+}
+
+function toTransducer(document: AutomatonDocument, type: AutomatonType): AutomatonDocument {
+  const { alphabet } = document
+  const mealy = !outputsOnStates(type)
+  return {
+    type,
+    alphabet,
+    output: document.output ?? createOutputSettings(),
+    graph: {
+      states: document.graph.states.map(({ output: _, ...s }) => ({
+        ...s,
+        isFinal: false,
+        ...(mealy ? {} : { output: [] })
+      })),
+      transitions: document.graph.transitions.map((t) => {
+        const reads = readSymbols(t.labels, alphabet)
+        const labels = mealy ? reads.map((read) => ({ read, output: [] })) : symbolLabels(reads)
+        return { ...t, labels }
+      })
+    }
+  }
+}
+
+/** Transduktor als DEA ohne Ausgaben – der weitere Typwechsel läuft dann wie beim DEA. */
+function withoutOutputs(document: AutomatonDocument): AutomatonDocument {
+  return {
+    type: 'DFA',
+    alphabet: document.alphabet,
+    graph: {
+      states: document.graph.states.map(({ output: _, ...s }) => s),
+      transitions: document.graph.transitions.map((t) => ({
+        ...t,
+        labels: symbolLabels(readSymbols(t.labels))
+      }))
+    }
   }
 }

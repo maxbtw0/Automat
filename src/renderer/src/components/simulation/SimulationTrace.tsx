@@ -1,8 +1,14 @@
 import { memo, useCallback, useEffect, useRef, type Ref } from 'react'
-import { formatLabel, formatStack, formatTape } from '@/core/automaton/labels'
+import {
+  formatLabel,
+  formatStack,
+  formatTape,
+  formatWord,
+  labelWordAlphabet
+} from '@/core/automaton/labels'
 import { getAutomatonDefinition } from '@/core/automaton/registry'
 import type { SimulationStep } from '@/core/automaton/types'
-import { usesStack, usesTape } from '@/model/graph'
+import { usesOutput, usesStack, usesTape } from '@/model/graph'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 import { formatStateSet } from '@/utils/format'
@@ -12,16 +18,18 @@ import type { SimulationControls } from './useSimulation'
  * Tabelle der Konfigurationen: Schritt · gelesenes Symbol · Zustand · Resteingabe.
  * Kellerautomat: Schritt · Regel · Zustand · Resteingabe · Stack – also (q, w, γ).
  * Turingmaschine: Schritt · Regel · Zustand · Band mit Kopf in eckigen Klammern.
+ * Transduktor: zusätzlich die Ausgabe bis hierher (Mealy: Regel „a/0“ statt Gelesen).
  */
 export function SimulationTrace({ sim }: { sim: SimulationControls }) {
   const states = useEditorStore((s) => s.document.graph.states)
   const type = useEditorStore((s) => s.document.type)
-  const gamma = useEditorStore((s) => s.document.stack?.alphabet)
+  const gamma = useEditorStore((s) => labelWordAlphabet(s.document))
   const single = getAutomatonDefinition(type).singlePath
   const hasStack = usesStack(type)
   const hasTape = usesTape(type)
-  const hasRule = hasStack || hasTape
-  const columns = hasStack ? 5 : 4
+  const hasOutput = usesOutput(type)
+  const hasRule = hasStack || hasTape || type === 'MEALY'
+  const columns = hasStack || hasOutput ? 5 : 4
   const currentRowRef = useRef<HTMLTableRowElement>(null)
 
   // Mit Block-Rumpf: scrollIntoView liefert in neueren Chromium-Versionen ein Promise, und ein
@@ -50,6 +58,7 @@ export function SimulationTrace({ sim }: { sim: SimulationControls }) {
             <th>Zustand</th>
             <th>{hasTape ? 'Band' : 'Resteingabe'}</th>
             {hasStack && <th>Stack</th>}
+            {hasOutput && <th>Ausgabe</th>}
           </tr>
         </thead>
         <tbody>
@@ -74,6 +83,7 @@ export function SimulationTrace({ sim }: { sim: SimulationControls }) {
                 states={formatStates(step.activeStateIds)}
                 hasRule={hasRule}
                 hasStack={hasStack}
+                hasOutput={hasOutput}
                 gamma={gamma}
                 onSelect={select}
               />
@@ -96,6 +106,8 @@ interface TraceRowProps {
   states: string
   hasRule: boolean
   hasStack: boolean
+  hasOutput: boolean
+  /** Γ beim Kellerautomaten, Δ beim Transduktor */
   gamma?: string[]
   onSelect(position: number): void
 }
@@ -113,6 +125,7 @@ const TraceRow = memo(function TraceRow({
   states,
   hasRule,
   hasStack,
+  hasOutput,
   gamma,
   onSelect
 }: TraceRowProps) {
@@ -131,6 +144,7 @@ const TraceRow = memo(function TraceRow({
         {step.tape ? formatTape(step.tape, step.head ?? 0) : step.remaining || 'ε'}
       </td>
       {hasStack && <td className="is-mono">{formatStack(step.stack ?? [], gamma)}</td>}
+      {hasOutput && <td className="is-mono">{formatWord((step.output ?? []).flat(), gamma)}</td>}
     </tr>
   )
 })

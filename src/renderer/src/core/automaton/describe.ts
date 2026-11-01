@@ -1,12 +1,13 @@
 import {
   EPSILON,
-  acceptsByEmptyStack,
+  endsWithoutFinal,
   findState,
+  outputSettings,
   stackSettings,
   type AutomatonDocument,
   type StateId
 } from '@/model/graph'
-import { formatStack, formatStackWord } from './labels'
+import { formatStack, formatStackWord, formatWord } from './labels'
 import type { SimulationStep } from './types'
 
 const quote = (text: string): string => `„${text}“`
@@ -23,7 +24,8 @@ const sentence = (text: string): string => `${text.charAt(0).toUpperCase()}${tex
 /**
  * Beschreibt einen Simulationsschritt in einem Satz, z. B. „Es wird „a“ gelesen und in den
  * Endzustand (q2) gewechselt.“ – beim Kellerautomaten mit Stackoperationen, bei der
- * Turingmaschine mit Schreiben und Kopfbewegung. `previous` = Schritt davor (für „beibehalten“).
+ * Turingmaschine mit Schreiben und Kopfbewegung, beim Transduktor mit der Ausgabe.
+ * `previous` = Schritt davor (für „beibehalten“).
  */
 export function describeStep(
   document: AutomatonDocument,
@@ -31,11 +33,16 @@ export function describeStep(
   previous?: SimulationStep
 ): string {
   const { graph } = document
-  const finals = !acceptsByEmptyStack(document)
+  const finals = !endsWithoutFinal(document)
   const label = (id: StateId): string => findState(graph, id)?.label ?? '?'
   const isFinal = (id: StateId): boolean => finals && findState(graph, id)?.isFinal === true
   const states = step.activeStateIds
   const gamma = stackSettings(document).alphabet
+  /** Transduktor: Ausgabe dieses Schritts – `null` bei Automaten ohne Ausgabe */
+  const piece = step.output?.[step.index] ?? null
+  const delta = outputSettings(document).alphabet
+  const output = (word: string[]): string =>
+    word.length === 0 ? 'nichts ausgegeben' : `${quote(formatWord(word, delta))} ausgegeben`
 
   if (step.index === 0 || !previous) {
     const start =
@@ -43,7 +50,9 @@ export function describeStep(
         ? `Start in Zustand ${label(states[0])}`
         : `Start in den Zuständen ${joinList(states.map(label))}`
     const stack = step.stack && `, auf dem Stack liegt ${quote(formatStack(step.stack, gamma))}`
-    return sentence(`${start}${stack || ''}`)
+    // Moore gibt schon im Startzustand etwas aus
+    const first = piece && piece.length > 0 ? `, dabei wird ${output(piece)}` : ''
+    return sentence(`${start}${stack || ''}${first}`)
   }
 
   const read = step.label?.read ?? step.symbol ?? EPSILON
@@ -58,6 +67,7 @@ export function describeStep(
     }
   }
   if (rule?.write !== undefined) clauses.push(`${quote(rule.write)} geschrieben`)
+  if (piece) clauses.push(output(piece))
 
   if (states.length === 1) {
     const [state] = states
@@ -77,12 +87,25 @@ export function describeStep(
   return `Es wird ${joinList(clauses)}.`
 }
 
-/** Satz zum Ergebnis eines Laufs: „Das Wort „ab“ wird akzeptiert.“ */
+/**
+ * Satz zum Ergebnis eines Laufs: „Das Wort „ab“ wird akzeptiert.“ Beim Transduktor mit der
+ * Ausgabe (`output` als Text): „Das Wort „ab“ wird in „01“ übersetzt.“
+ */
 export function describeOutcome(
   word: string,
   accepted: boolean,
-  abortReason?: string | null
+  abortReason?: string | null,
+  output?: string
 ): string {
+  if (output !== undefined) {
+    if (abortReason) return `${abortReason}, Ausgabe bis dahin ${quote(output)}.`
+    return `Das Wort ${quote(word || EPSILON)} wird in ${quote(output)} übersetzt.`
+  }
   if (abortReason) return `${abortReason}.`
   return `Das Wort ${quote(word || EPSILON)} wird ${accepted ? 'akzeptiert' : 'verworfen'}.`
+}
+
+/** Bisherige Ausgabe eines Schritts als Text („ε“, wenn noch nichts ausgegeben ist). */
+export function formatStepOutput(document: AutomatonDocument, step: SimulationStep): string {
+  return formatWord((step.output ?? []).flat(), outputSettings(document).alphabet)
 }

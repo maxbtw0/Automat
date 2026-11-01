@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { buildDocument } from '@/core/automaton/testing'
 import { createEmptyDocument, symbolLabels } from '@/model/graph'
 import { groupSelection, isSelected, toggleSelected, useEditorStore } from './editorStore'
 
@@ -433,5 +434,54 @@ describe('Mehrfachauswahl', () => {
     expect(store().selection).toEqual({ kind: 'group', stateIds: [p, q], transitionIds: [] })
     store().deleteState(q)
     expect(store().selection).toEqual({ kind: 'state', id: p })
+  })
+})
+
+describe('Ausgabealphabet Δ', () => {
+  const mealy = buildDocument('MEALY', ['a'], { start: 'q0', output: ['0', '1'] }, [
+    ['q0', 'a/01', 'q0']
+  ])
+  const moore = buildDocument(
+    'MOORE',
+    ['a'],
+    { start: 'q0', output: ['0', '1'], outputs: { q0: '10' } },
+    [['q0', 'a', 'q0']]
+  )
+  const rules = () => store().document.graph.transitions[0].labels
+
+  it('neues Ausgabesymbol: erst Ziffern', () => {
+    store().loadDocument(createEmptyDocument('MEALY'), null)
+    expect(store().addSymbol('output')).toBe('0')
+    expect(store().addSymbol('output')).toBe('1')
+    expect(store().document.output?.alphabet).toEqual(['0', '1'])
+    expect(store().document.alphabet).toEqual([])
+  })
+
+  it('Umbenennen ändert die Ausgaben der Regeln (Mealy) und Zustände (Moore)', () => {
+    store().loadDocument(structuredClone(mealy), null)
+    store().renameSymbol('1', 'x', 'output')
+    expect(store().document.output?.alphabet).toEqual(['0', 'x'])
+    expect(rules()).toEqual([{ read: 'a', output: ['0', 'x'] }])
+
+    store().loadDocument(structuredClone(moore), null)
+    store().renameSymbol('1', 'x', 'output')
+    expect(store().document.graph.states[0].output).toEqual(['x', '0'])
+  })
+
+  it('Löschen nimmt das Symbol nur aus den Ausgabewörtern, die Regel bleibt', () => {
+    store().loadDocument(structuredClone(mealy), null)
+    store().deleteSymbol(0, 'output')
+    expect(store().document.output?.alphabet).toEqual(['1'])
+    expect(rules()).toEqual([{ read: 'a', output: ['1'] }])
+
+    store().loadDocument(structuredClone(moore), null)
+    store().deleteSymbol(1, 'output')
+    expect(store().document.graph.states[0].output).toEqual(['0'])
+  })
+
+  it('Voreinstellung behält benutzte Ausgabesymbole', () => {
+    store().loadDocument(structuredClone(moore), null)
+    expect(store().applyAlphabetPreset(['a', 'b'], 'output')).toEqual(['0', '1'])
+    expect(store().document.output?.alphabet).toEqual(['a', 'b', '0', '1'])
   })
 })

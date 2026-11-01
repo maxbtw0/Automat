@@ -7,10 +7,14 @@ import {
   asTuring,
   formatLabelsInline,
   formatStackWord,
+  formatWord,
+  labelWordAlphabet,
+  nextMealyLabel,
   nextPushdownLabel,
   nextTuringLabel,
   parseLabels,
-  parseStackWord
+  parseStackWord,
+  parseWord
 } from '@/core/automaton/labels'
 import { getAutomatonDefinition } from '@/core/automaton/registry'
 import {
@@ -21,10 +25,14 @@ import {
   labelKey,
   normalizeSymbol,
   normalizeTapeSymbol,
+  outputSettings,
+  outputsOnStates,
   stackSettings,
+  stateOutput,
   symbolLabels,
   tapeSettings,
   TAPE_MOVES,
+  usesOutput,
   usesStack,
   usesTape,
   type AutomatonDocument,
@@ -63,9 +71,24 @@ export function PropertiesPanel() {
 }
 
 function StateProperties({ state, doc }: { state: StateNode; doc: AutomatonDocument }) {
-  const { updateState, setStartState, toggleFinal, deleteState, select } = useEditorStore.getState()
+  const { updateState, setStartState, toggleFinal, deleteState, select, setStatus } =
+    useEditorStore.getState()
   const outgoing = doc.graph.transitions.filter((t) => t.from === state.id)
-  const gamma = stackSettings(doc).alphabet
+  const gamma = labelWordAlphabet(doc)
+  const delta = outputSettings(doc).alphabet
+
+  /** Moore: Ausgabe λ(z) aus Δ*, leer = ε */
+  const commitOutput = (text: string): boolean => {
+    const output = parseWord(text, delta)
+    const unknown = output.find((symbol) => !delta.includes(symbol))
+    if (unknown !== undefined) {
+      setStatus({ kind: 'error', text: `„${unknown}“ nicht im Ausgabealphabet` })
+      return false
+    }
+    setStatus(null)
+    updateState(state.id, { output })
+    return true
+  }
   const labelOf = (id: string): string => findState(doc.graph, id)?.label ?? '?'
 
   return (
@@ -91,10 +114,23 @@ function StateProperties({ state, doc }: { state: StateNode; doc: AutomatonDocum
         />
         Startzustand
       </label>
-      <label className="checkbox">
-        <input type="checkbox" checked={state.isFinal} onChange={() => toggleFinal(state.id)} />
-        Endzustand
-      </label>
+      {!usesOutput(doc.type) && (
+        <label className="checkbox">
+          <input type="checkbox" checked={state.isFinal} onChange={() => toggleFinal(state.id)} />
+          Endzustand
+        </label>
+      )}
+      {outputsOnStates(doc.type) && (
+        <div className="field">
+          <span className="field-label">Ausgabe</span>
+          <CommitInput
+            className="is-mono"
+            value={formatWord(stateOutput(state), delta)}
+            onFocus={(e) => e.currentTarget.select()}
+            onCommit={commitOutput}
+          />
+        </div>
+      )}
 
       <div className="field">
         <span className="field-label">Ausgehende Übergänge</span>
@@ -138,6 +174,8 @@ function TransitionProperties({
       </div>
       {usesTape(doc.type) ? (
         <TuringRuleList transition={transition} doc={doc} />
+      ) : doc.type === 'MEALY' ? (
+        <MealyRuleList transition={transition} doc={doc} />
       ) : usesStack(doc.type) ? (
         <RuleList transition={transition} doc={doc} />
       ) : (
@@ -288,6 +326,101 @@ function ruleActions(transition: TransitionEdge) {
   }
 
   return { replace, fail }
+}
+
+/**
+ * Mealy-Automat: eine Zeile pro Regel „a/01“. Eingabe tippen oder aus Σ wählen, Ausgabe frei
+ * eintippen (Wort aus Δ*, leer = ε). „+ Regel“ nimmt das nächste Symbol, das der Zustand noch
+ * nicht liest.
+ */
+function MealyRuleList({
+  transition,
+  doc
+}: {
+  transition: TransitionEdge
+  doc: AutomatonDocument
+}) {
+  const { updateTransition } = useEditorStore.getState()
+  const { labels } = transition
+  const delta = outputSettings(doc).alphabet
+  const { replace, fail } = ruleActions(transition)
+
+  const commitRead = (index: number, input: string): boolean => {
+    const read = normalizeSymbol(input)
+    if (!doc.alphabet.includes(read)) return fail(`„${read || EPSILON}“ nicht im Alphabet`)
+    replace(index, { read, output: labels[index].output ?? [] })
+    return true
+  }
+
+  const commitOutput = (index: number, text: string): boolean => {
+    const output = parseWord(text, delta)
+    const unknown = output.find((symbol) => !delta.includes(symbol))
+    if (unknown !== undefined) return fail(`„${unknown}“ nicht im Ausgabealphabet`)
+    replace(index, { read: labels[index].read, output })
+    return true
+  }
+
+  const addRule = (): void => {
+    // Alle Regeln des Zustands zählen – auch die an anderen Übergängen (Determinismus)
+    const stateRules = doc.graph.transitions
+      .filter((t) => t.from === transition.from)
+      .flatMap((t) => t.labels)
+    const label = nextMealyLabel(stateRules, doc.alphabet)
+    if (!label) {
+      fail('Alle Symbole belegt')
+      return
+    }
+    updateTransition(transition.id, { labels: [...labels, label] })
+  }
+
+  const selectAll = (e: { currentTarget: HTMLInputElement }): void => e.currentTarget.select()
+
+  return (
+    <div className="field">
+      <span className="field-label">Regeln</span>
+      <div className="rule-list">
+        {labels.length > 0 && (
+          <div className="rule-row is-mealy is-header" aria-hidden="true">
+            <span>Eingabe</span>
+            <span />
+            <span>Ausgabe</span>
+          </div>
+        )}
+        {labels.map((label, i) => (
+          // Position als key: Fokus bleibt beim Tab in der Zeile
+          <div className="rule-row is-mealy" key={i}>
+            <ComboInput
+              className="is-mono"
+              aria-label={`Eingabe Regel ${i + 1}`}
+              value={label.read}
+              options={doc.alphabet}
+              onFocus={selectAll}
+              onCommit={(value) => commitRead(i, value)}
+            />
+            <span className="rule-arrow">/</span>
+            <CommitInput
+              className="is-mono"
+              aria-label={`Ausgabe Regel ${i + 1}`}
+              value={formatWord(label.output ?? [], delta)}
+              onFocus={selectAll}
+              onCommit={(value) => commitOutput(i, value)}
+            />
+            <button
+              className="btn is-ghost is-icon rule-delete"
+              onClick={() => replace(i, null)}
+              title="Regel löschen"
+              aria-label={`Regel ${i + 1} löschen`}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        ))}
+        <button className="btn is-ghost rule-add" onClick={addRule}>
+          <Icon name="plus" size={14} /> Regel
+        </button>
+      </div>
+    </div>
+  )
 }
 
 const MOVE_TITLES: Record<TapeMove, string> = {

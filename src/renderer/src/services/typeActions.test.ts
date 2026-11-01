@@ -99,3 +99,51 @@ describe('changeAutomatonType mit Kellerautomat', () => {
     expect(store().document.graph.transitions[0].labels).toEqual([{ read: 'a' }])
   })
 })
+
+describe('changeAutomatonType mit Transduktoren', () => {
+  const mealy = buildDocument('MEALY', ['a'], { start: 'q0', output: ['0', '1'] }, [
+    ['q0', 'a/0', 'q1'],
+    ['q1', 'a/1', 'q1']
+  ])
+
+  /** Startet den Typwechsel und beantwortet den Dialog `title` mit Knopf `index`. */
+  async function switchAnswering(type: 'MEALY' | 'MOORE' | 'DFA', title: string, index: number) {
+    const done = changeAutomatonType(type)
+    expect(useDialogStore.getState().request?.title).toBe(title)
+    useDialogStore.getState().answer(index)
+    await done
+  }
+
+  it('Mealy → Moore „Umwandeln“ teilt Zustände nach der Ausgabe auf', async () => {
+    store().loadDocument(structuredClone(mealy), null)
+    await switchAnswering('MOORE', 'Mealy in Moore umwandeln?', 0)
+    expect(store().document.type).toBe('MOORE')
+    expect(store().document.graph.states.map((s) => [s.label, s.output])).toEqual([
+      ['q0', []],
+      ['q1_0', ['0']],
+      ['q1_1', ['1']]
+    ])
+  })
+
+  it('Mealy → Moore „Nur Typ ändern“ entfernt die Ausgaben', async () => {
+    store().loadDocument(structuredClone(mealy), null)
+    await switchAnswering('MOORE', 'Mealy in Moore umwandeln?', 1)
+    expect(store().document.type).toBe('MOORE')
+    expect(store().document.graph.transitions[0].labels).toEqual([{ read: 'a' }])
+  })
+
+  it('Mealy → DEA fragt, ob die Ausgaben wegfallen dürfen', async () => {
+    store().loadDocument(structuredClone(mealy), null)
+    await switchAnswering('DFA', 'Ausgaben entfernen?', 1)
+    expect(store().document).toEqual(mealy)
+    await switchAnswering('DFA', 'Ausgaben entfernen?', 0)
+    expect(store().document.type).toBe('DFA')
+    expect(store().document.output).toBeUndefined()
+  })
+
+  it('NEA mit Endzuständen → Mealy fragt, ob die Endzustände wegfallen dürfen', async () => {
+    await switchAnswering('MEALY', 'Endzustände entfernen?', 0)
+    expect(store().document.type).toBe('MEALY')
+    expect(store().document.graph.states.some((s) => s.isFinal)).toBe(false)
+  })
+})

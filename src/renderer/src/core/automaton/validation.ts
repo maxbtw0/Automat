@@ -4,7 +4,8 @@ import {
   type AutomatonDocument,
   type EditorGraph,
   type StateId,
-  type StateNode
+  type StateNode,
+  type TransitionId
 } from '@/model/graph'
 import type { ValidationIssue } from './types'
 
@@ -79,6 +80,53 @@ export function checkSymbols(
         })
       }
     }
+  }
+  return issues
+}
+
+/**
+ * Pro (Zustand, Symbol) höchstens eine Regel – endliche Automaten ohne ε und Transduktoren.
+ * Zählt Regeln, nicht Übergänge: „a/0“ und „a/1“ am selben Übergang kollidieren auch.
+ */
+export function checkDeterminism(graph: EditorGraph): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  for (const state of graph.states) {
+    const bySymbol = new Map<string, TransitionId[]>()
+    for (const t of graph.transitions) {
+      if (t.from !== state.id) continue
+      for (const label of t.labels) {
+        if (label.read === EPSILON) continue // meldet schon checkSymbols
+        bySymbol.set(label.read, [...(bySymbol.get(label.read) ?? []), t.id])
+      }
+    }
+    for (const [symbol, transitionIds] of bySymbol) {
+      if (transitionIds.length < 2) continue
+      issues.push({
+        severity: 'error',
+        message: `Nicht deterministisch: ${state.label} mit „${symbol}“`,
+        stateIds: [state.id],
+        transitionIds: [...new Set(transitionIds)]
+      })
+    }
+  }
+  return issues
+}
+
+/** Pro (Zustand, Symbol) mindestens ein Folgezustand – sonst Warnung. */
+export function checkCompleteness(document: AutomatonDocument): ValidationIssue[] {
+  const { graph, alphabet } = document
+  const issues: ValidationIssue[] = []
+  for (const state of graph.states) {
+    const defined = new Set(
+      graph.transitions.filter((t) => t.from === state.id).flatMap(edgeSymbols)
+    )
+    const missing = alphabet.filter((a) => !defined.has(a))
+    if (missing.length === 0) continue
+    issues.push({
+      severity: 'warning',
+      message: `Unvollständig: ${state.label} ohne ${missing.map((a) => `„${a}“`).join(', ')}`,
+      stateIds: [state.id]
+    })
   }
   return issues
 }

@@ -5,6 +5,7 @@ import {
   captionSvg,
   graphSvg,
   columnSvg,
+  outputFigureSvg,
   pageSvg,
   paragraphSvg,
   rowSvg,
@@ -26,12 +27,19 @@ import {
   transitionTable,
   type SimulationSnapshot
 } from '@/export/tables'
-import { describeOutcome, describeStep } from '@/core/automaton/describe'
-import { formatLabel } from '@/core/automaton/labels'
+import { describeOutcome, describeStep, formatStepOutput } from '@/core/automaton/describe'
+import { formatLabel, formatWord } from '@/core/automaton/labels'
 import { EXPORT_STEP_LIMIT, simulationLimits } from '@/core/automaton/limits'
 import { createAutomaton } from '@/core/automaton/registry'
 import type { SimulationStep } from '@/core/automaton/types'
-import { tapeSettings, type AutomatonDocument } from '@/model/graph'
+import { tokenizeWord } from '@/core/automaton/word'
+import {
+  outputSettings,
+  outputsOnStates,
+  tapeSettings,
+  usesOutput,
+  type AutomatonDocument
+} from '@/model/graph'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore, type Screen } from '@/store/screenStore'
@@ -266,11 +274,42 @@ function prepare(
     const text = describeStep(document, snapshot.steps[i], snapshot.steps[i - 1])
     if (i !== last) return text
     const accepted = snapshot.outcome === 'accepted'
-    return `${text} ${describeOutcome(snapshot.word, accepted, snapshot.abortReason)}`
+    // Transduktor: Ergebnis ist die Ausgabe
+    const output = usesOutput(document.type)
+      ? formatStepOutput(document, snapshot.steps[i])
+      : undefined
+    return `${text} ${describeOutcome(snapshot.word, accepted, snapshot.abortReason, output)}`
   }
+  // Transduktor: Eingabe über Ausgabe über dem Graphen; die Spalten sind in der Bildfolge so
+  // breit wie ihr endgültiges Stück
+  const delta = outputSettings(document).alphabet
+  const moore = outputsOnStates(document.type)
+  const inputs = [...(moore ? [null] : []), ...tokenizeWord(snapshot.word, document.alphabet)]
+  const finalStep = snapshot.steps[last]
+  const pieceText = (step: SimulationStep, column: number): string | null => {
+    const piece = step.output?.[column + (moore ? 0 : 1)]
+    return piece === undefined ? null : formatWord(piece, delta)
+  }
+  const outputFigure = (step: SimulationStep, i: number): SvgImage =>
+    outputFigureSvg(
+      inputs.map((input, column) => ({
+        input,
+        output: pieceText(step, column),
+        reserve: pieceText(finalStep, column) ?? ''
+      })),
+      {
+        palette,
+        // Spalte des letzten Schritts: Moore zählt die Start-Spalte mit
+        current: moore ? step.index : step.index - 1,
+        outcome: outcomeAt(i),
+        word: formatStepOutput(document, step),
+        reserveWord: formatStepOutput(document, finalStep)
+      }
+    )
   const stateLabel = (step: SimulationStep): string =>
     document.graph.states.find((s) => s.id === step.activeStateIds[0])?.label ?? ''
-  const withStack = (graph: SvgImage, step: SimulationStep): SvgImage => {
+  const withStack = (graph: SvgImage, step: SimulationStep, i: number): SvgImage => {
+    if (step.output) return columnSvg([outputFigure(step, i), graph], 8)
     if (step.tape) {
       const tape = tapeFigureSvg(step.tape, step.head ?? 0, {
         palette,
@@ -287,7 +326,11 @@ function prepare(
   if (content === 'simulationGraph') {
     const pages = snapshot.steps.map((step, i) => {
       const highlight = highlightOf(step, outcomeAt(i))
-      const graph = withStack(graphSvg(document, highlight, { palette, idPrefix: `s${i}` }), step)
+      const graph = withStack(
+        graphSvg(document, highlight, { palette, idPrefix: `s${i}` }),
+        step,
+        i
+      )
       // Mindestbreite, damit die Beschreibung bei kleinen Graphen nicht zu oft umbricht
       const width = description ? Math.max(graph.width, 480) : graph.width
       const parts = [captionSvg(stepCaption(step), width, palette), graph]
@@ -300,7 +343,7 @@ function prepare(
   // als PDF Graph quer, dahinter die Tabelle hoch; als Bild beides untereinander
   const step = snapshot.steps[snapshot.index]
   const highlight = highlightOf(step, outcomeAt(snapshot.index))
-  const graph = withStack(graphSvg(document, highlight, { palette }), step)
+  const graph = withStack(graphSvg(document, highlight, { palette }), step, snapshot.index)
   const table = named(simulationTable(document, snapshot, { markCurrent: true }))
   if (format === 'pdf') return { table: null, pages: [layout.graph(graph), ...layout.table(table)] }
   return { table: null, pages: [columnSvg([graph, tableSvg(table, palette)], 16)] }

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, typ
 import {
   findState,
   findTransition,
-  acceptsByEmptyStack,
-  stackSettings,
+  endsWithoutFinal,
+  outputSettings,
+  outputsOnStates,
+  usesOutput,
   usesStack,
   usesTape,
   type StateId,
@@ -35,7 +37,13 @@ import {
 } from '@/utils/geometry'
 import { isPanKey, panModifierHeld } from '@shared/navigationSettings'
 import { ContextMenu, type ContextMenuEntry } from '@/components/common/ContextMenu'
-import { formatLabelsInline, parseLabels } from '@/core/automaton/labels'
+import {
+  formatLabelsInline,
+  labelWordAlphabet,
+  parseLabels,
+  parseWord,
+  stateText
+} from '@/core/automaton/labels'
 import { InlineEditor } from './InlineEditor'
 import { StateNodeView } from './StateNodeView'
 import { TransitionView } from './TransitionView'
@@ -61,7 +69,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
 
   const doc = useEditorStore((s) => s.document)
-  const stackAlphabet = doc.stack?.alphabet
+  /** Γ bzw. Δ – trennt Push- und Ausgabewörter, die sonst mehrdeutig wären */
+  const stackAlphabet = labelWordAlphabet(doc)
   const tool = useEditorStore((s) => s.tool)
   const viewport = useEditorStore((s) => s.viewport)
   const selection = useEditorStore((s) => s.selection)
@@ -533,7 +542,16 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         if (!state) return []
         return [
           { label: 'Startzustand', checked: state.isStart, onSelect: () => store.setStartState(state.id) },
-          { label: 'Endzustand', checked: state.isFinal, onSelect: () => store.toggleFinal(state.id) },
+          // Transduktoren haben keine Endzustände
+          ...(usesOutput(doc.type)
+            ? []
+            : [
+                {
+                  label: 'Endzustand',
+                  checked: state.isFinal,
+                  onSelect: () => store.toggleFinal(state.id)
+                }
+              ]),
           'separator',
           { label: 'Umbenennen', onSelect: () => store.setInlineEdit({ kind: 'state', id: state.id }) },
           { label: 'Löschen', danger: true, onSelect: () => store.deleteState(state.id) }
@@ -574,17 +592,26 @@ export function Canvas({ readOnly = false }: CanvasProps) {
       const state = findState(doc.graph, inlineEdit.id)
       if (!state) return null
       const pos = worldToScreen(viewport, state)
+      // Moore: „q0/1“ – Name und Ausgabe in einem Feld
+      const moore = outputsOnStates(doc.type)
       return (
         <InlineEditor
           key={state.id}
           x={pos.x}
           y={pos.y}
-          initialValue={state.label}
-          placeholder="Bezeichnung"
+          initialValue={stateText(state, doc)}
+          placeholder={moore ? 'q0/1' : 'Bezeichnung'}
           onCancel={close}
           onCommit={(value) => {
-            const label = value.trim()
-            if (label && label !== state.label) store.updateState(state.id, { label })
+            const slash = moore ? value.indexOf('/') : -1
+            const label = (slash === -1 ? value : value.slice(0, slash)).trim() || state.label
+            const output =
+              slash === -1
+                ? state.output
+                : parseWord(value.slice(slash + 1), outputSettings(doc).alphabet)
+            if (stateText({ ...state, label, output }, doc) !== stateText(state, doc)) {
+              store.updateState(state.id, moore ? { label, output } : { label })
+            }
             close()
           }}
         />
@@ -596,8 +623,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     if (!transition || !geometry) return null
     const pos = worldToScreen(viewport, geometry.label)
     const { append = false } = inlineEdit
-    // Push-Wörter mit Γ formatieren, damit parseLabels dieselben Symbole zurückliest
-    const gamma = stackSettings(doc).alphabet
+    // Push- und Ausgabewörter mit Γ bzw. Δ formatieren, damit parseLabels dieselben Symbole
+    // zurückliest
+    const gamma = stackAlphabet
     return (
       <InlineEditor
         key={append ? `${transition.id}:append` : transition.id}
@@ -609,7 +637,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
             ? 'a A R; # # L'
             : usesStack(doc.type)
               ? 'a, # → A#; b, A → ε'
-              : 'Symbole, z. B. a, b'
+              : doc.type === 'MEALY'
+                ? 'a/0, b/1'
+                : 'Symbole, z. B. a, b'
         }
         wide={usesStack(doc.type) || usesTape(doc.type)}
         onCancel={close}
@@ -725,7 +755,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
               selected={!readOnly && isSelected(selection, 'state', s.id)}
               active={activeStates.has(s.id)}
               outcome={highlight?.outcome}
-              acceptAny={acceptsByEmptyStack(doc)}
+              acceptAny={endsWithoutFinal(doc)}
+              text={stateText(s, doc)}
               onPointerDown={handleStatePointerDown}
               onDoubleClick={handleStateDoubleClick}
               onContextMenu={handleStateContextMenu}

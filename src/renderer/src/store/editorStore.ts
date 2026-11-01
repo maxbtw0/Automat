@@ -9,9 +9,11 @@ import {
   addTransitionEntry,
   removeTransitionEntry,
   replaceTransitionEntry,
+  outputSettings,
   stackSettings,
   tapeSettings,
   usesTape,
+  OUTPUT_CANDIDATES,
   STACK_CANDIDATES,
   labelKey,
   labelSymbols,
@@ -166,12 +168,16 @@ interface EditorState {
   /** Ersetzt das ganze Dokument als ein Undo-Schritt (z. B. Ergebnis einer Umwandlung). */
   applyDocument(document: AutomatonDocument): void
 
-  // --- Alphabet (Σ, beim Kellerautomaten Stack-Γ, bei der Turingmaschine Band-Γ ⊇ Σ) ---
+  // --- Alphabet (Σ, beim Kellerautomaten Stack-Γ, bei der Turingmaschine Band-Γ ⊇ Σ,
+  //     beim Transduktor Δ) ---
 
   addSymbol(kind?: AlphabetKind): string
   /** Benennt ein Symbol um – auch in allen Regeln (und beim Stack-Startsymbol) */
   renameSymbol(oldSymbol: string, newSymbol: string, kind?: AlphabetKind): void
-  /** Löscht ein Symbol – Regeln, die es benutzen, verschwinden mit */
+  /**
+   * Löscht ein Symbol – Regeln, die es benutzen, verschwinden mit. Ein Ausgabesymbol verschwindet
+   * nur aus den Ausgabewörtern.
+   */
   deleteSymbol(index: number, kind?: AlphabetKind): void
   sortAlphabet(kind?: AlphabetKind): void
   /**
@@ -254,7 +260,9 @@ const alphabetOf = (doc: AutomatonDocument, kind: AlphabetKind): string[] =>
     ? doc.alphabet
     : kind === 'tape'
       ? tapeSettings(doc).alphabet
-      : stackSettings(doc).alphabet
+      : kind === 'output'
+        ? outputSettings(doc).alphabet
+        : stackSettings(doc).alphabet
 
 const withAlphabet = (
   doc: AutomatonDocument,
@@ -263,8 +271,30 @@ const withAlphabet = (
 ): AutomatonDocument => {
   if (kind === 'input') return { ...doc, alphabet }
   if (kind === 'tape') return { ...doc, tape: { ...tapeSettings(doc), alphabet } }
+  if (kind === 'output') return { ...doc, output: { ...outputSettings(doc), alphabet } }
   return { ...doc, stack: { ...stackSettings(doc), alphabet } }
 }
+
+/**
+ * Transduktor: wendet `map` auf jedes Ausgabewort an – an den Regeln (Mealy) und an den
+ * Zuständen (Moore). Unveränderte Regeln und Zustände bleiben dieselben Objekte.
+ */
+const mapOutputs = (
+  doc: AutomatonDocument,
+  map: (word: string[]) => string[]
+): AutomatonDocument => {
+  const withLabels = mapLabels(doc, (l) => (l.output ? { ...l, output: map(l.output) } : l))
+  return withGraph(withLabels, {
+    states: doc.graph.states.map((s) => (s.output ? { ...s, output: map(s.output) } : s))
+  })
+}
+
+/** Ausgabesymbole, die irgendwo benutzt werden (Regeln und Zustände) */
+const usedOutputSymbols = (doc: AutomatonDocument): Set<string> =>
+  new Set([
+    ...doc.graph.transitions.flatMap((t) => t.labels.flatMap((l) => l.output ?? [])),
+    ...doc.graph.states.flatMap((s) => s.output ?? [])
+  ])
 
 /** Turingmaschine: Σ ⊆ Γ – neue Eingabesymbole kommen auch ins Bandalphabet (vor das Blank). */
 const withInputInTape = (doc: AutomatonDocument, symbols: string[]): AutomatonDocument => {
@@ -389,7 +419,10 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       const symbol =
         kind === 'input'
           ? nextFreeSymbol([...doc.alphabet, ...taken])
-          : nextFreeSymbol(alphabetOf(doc, kind), STACK_CANDIDATES)
+          : nextFreeSymbol(
+              alphabetOf(doc, kind),
+              kind === 'output' ? OUTPUT_CANDIDATES : STACK_CANDIDATES
+            )
       commit((d) => {
         const next = withAlphabet(d, kind, [...alphabetOf(d, kind), symbol])
         return kind === 'input' ? withInputInTape(next, [symbol]) : next
@@ -421,6 +454,10 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           )
           return withAlphabet(renamed, kind, doc.alphabet.map(rename))
         }
+        if (kind === 'output') {
+          const renamed = mapOutputs(doc, (word) => word.map(rename))
+          return withAlphabet(renamed, kind, alphabetOf(doc, kind).map(rename))
+        }
         const renamed = mapLabels(doc, (l) =>
           labelSymbols(l, kind).includes(oldSymbol)
             ? { ...l, pop: l.pop && rename(l.pop), push: l.push?.map(rename) }
@@ -445,6 +482,10 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         if (kind === 'input' && usesTape(doc.type)) {
           return withAlphabet(doc, kind, alphabet.filter((_, i) => i !== index))
         }
+        if (kind === 'output') {
+          const without = mapOutputs(doc, (word) => word.filter((s) => s !== symbol))
+          return withAlphabet(without, kind, alphabet.filter((_, i) => i !== index))
+        }
         const without = mapLabels(doc, (l) => (labelSymbols(l, kind).includes(symbol) ? null : l))
         const result = withAlphabet(without, kind, alphabet.filter((_, i) => i !== index))
         if (kind === 'stack' && result.stack?.start === symbol) {
@@ -462,9 +503,14 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     applyAlphabetPreset: (preset, kind = 'input') => {
       const symbols = preset.filter((s) => s !== '')
       const { document } = get()
-      const used = new Set(
-        document.graph.transitions.flatMap((t) => t.labels.flatMap((l) => labelSymbols(l, kind)))
-      )
+      const used =
+        kind === 'output'
+          ? usedOutputSymbols(document)
+          : new Set(
+              document.graph.transitions.flatMap((t) =>
+                t.labels.flatMap((l) => labelSymbols(l, kind))
+              )
+            )
       const kept = alphabetOf(document, kind).filter((s) => used.has(s) && !symbols.includes(s))
       commit((doc) => {
         // Das Bandalphabet behält immer Σ und das Blank, das Stackalphabet das Startsymbol

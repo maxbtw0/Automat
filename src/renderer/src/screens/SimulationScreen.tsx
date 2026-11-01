@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { Canvas } from '@/components/canvas/Canvas'
 import { SimulationSidebar } from '@/components/simulation/SimulationSidebar'
+import { SimulationOutput } from '@/components/simulation/SimulationOutput'
 import { SimulationStack } from '@/components/simulation/SimulationStack'
 import { SimulationTape } from '@/components/simulation/SimulationTape'
 import { SimulationTrace } from '@/components/simulation/SimulationTrace'
 import { useSimulation, type SimulationControls } from '@/components/simulation/useSimulation'
-import { usesStack, usesTape } from '@/model/graph'
+import { usesOutput, usesStack, usesTape } from '@/model/graph'
 import type { KeyAction } from '@shared/keybindings'
 import { keyActionForEvent } from '@/services/keyActions'
 import { isModalOpen } from '@/store/dialogStore'
@@ -14,20 +15,22 @@ import { classNames } from '@/utils/dom'
 
 /**
  * Simulation wie in AutoEdit: links die Steuerung, rechts oben der Graph (nur ansehen) – beim
- * Kellerautomaten rechts daneben der Stack, bei der Turingmaschine darüber das Band –, rechts
- * unten die Tabelle der Konfigurationen.
+ * Kellerautomaten rechts daneben der Stack, bei der Turingmaschine darüber das Band, beim
+ * Transduktor darüber Eingabe und Ausgabe –, rechts unten die Tabelle der Konfigurationen.
  */
 export function SimulationScreen() {
   const sim = useSimulation()
   useSimulationKeys(sim)
   const hasStack = useEditorStore((s) => usesStack(s.document.type))
   const hasTape = useEditorStore((s) => usesTape(s.document.type))
+  const hasOutput = useEditorStore((s) => usesOutput(s.document.type))
 
   return (
     <div className="sim-screen">
       <SimulationSidebar sim={sim} />
-      <div className={classNames('sim-main', hasTape && 'has-tape')}>
+      <div className={classNames('sim-main', hasTape && 'has-tape', hasOutput && 'has-output')}>
         {hasTape && <SimulationTape sim={sim} />}
+        {hasOutput && <SimulationOutput sim={sim} />}
         <div className={classNames('sim-top', hasStack && 'has-stack')}>
           <div className="sim-graph">
             <Canvas readOnly />

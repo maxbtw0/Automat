@@ -77,7 +77,8 @@ function isLabel(value: unknown): value is TransitionLabel {
     isOptional(value.pop, isString) &&
     isOptional(value.push, isStringArray) &&
     isOptional(value.write, isString) &&
-    isOptional(value.move, (m) => TAPE_MOVES.includes(m as TapeMove))
+    isOptional(value.move, (m) => TAPE_MOVES.includes(m as TapeMove)) &&
+    isOptional(value.output, isStringArray)
   )
 }
 
@@ -89,7 +90,8 @@ function isState(value: unknown): value is StateNode {
     isNumber(value.x) &&
     isNumber(value.y) &&
     isBoolean(value.isStart) &&
-    isBoolean(value.isFinal)
+    isBoolean(value.isFinal) &&
+    isOptional(value.output, isStringArray)
   )
 }
 
@@ -137,6 +139,12 @@ function checkTape(tape: unknown): void {
   if (!isString(tape.blank) || tape.blank === '') fail('Blank ungültig')
 }
 
+function checkOutput(output: unknown): void {
+  if (output === undefined) return
+  if (!isRecord(output)) fail('Ausgabeangaben ungültig')
+  checkAlphabet(output.alphabet, 'Δ')
+}
+
 export function deserializeDocument(text: string): AutomatonDocument {
   let data: unknown
   try {
@@ -174,6 +182,7 @@ export function deserializeDocument(text: string): AutomatonDocument {
   checkAlphabet(doc.alphabet, 'Σ')
   checkStack(doc.stack)
   checkTape(doc.tape)
+  checkOutput(doc.output)
   checkStates(doc.graph.states)
   checkTransitions(transitions)
   return document as unknown as AutomatonDocument

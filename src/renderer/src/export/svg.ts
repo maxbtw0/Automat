@@ -1,6 +1,6 @@
-import { labelLines } from '@/core/automaton/labels'
+import { labelLines, labelWordAlphabet, stateText } from '@/core/automaton/labels'
 import type { TapeSnapshot } from '@/core/automaton/types'
-import { acceptsByEmptyStack, type AutomatonDocument } from '@/model/graph'
+import { endsWithoutFinal, type AutomatonDocument } from '@/model/graph'
 import type { Highlight } from '@/store/editorStore'
 import {
   LABEL_LINE_HEIGHT,
@@ -151,7 +151,7 @@ export function graphSvg(
     if (!geometry) continue
     const active = activeTransitions.has(t.id)
     const color = active ? P.accent : P.edge
-    const lines = t.labels.length === 0 ? ['?'] : labelLines(t.labels, document.stack?.alphabet)
+    const lines = t.labels.length === 0 ? ['?'] : labelLines(t.labels, labelWordAlphabet(document))
     const textWidth = Math.max(...lines.map((line) => measureText(line, MONO, 13)))
     const { x, y } = labelCenter(geometry, textWidth, lines.length)
     const halfWidth = textWidth / 2 + 4
@@ -175,12 +175,13 @@ export function graphSvg(
 
   const nodes: string[] = []
   for (const s of states) {
-    // Lange Namen ragen über den Kreis hinaus
-    const half = Math.max(R, measureText(s.label, MONO, 14) / 2 + 2)
+    // Lange Namen ragen über den Kreis hinaus (Moore: „q0/1“)
+    const text = stateText(s, document)
+    const half = Math.max(R, measureText(text, MONO, 14) / 2 + 2)
     include(Math.min(s.x - half, s.x - R - (s.isStart ? 40 : 0)), s.y - R, s.x + half, s.y + R)
     const active = activeStates.has(s.id)
     const accepted =
-      active && highlight?.outcome === 'accepted' && (s.isFinal || acceptsByEmptyStack(document))
+      active && highlight?.outcome === 'accepted' && (s.isFinal || endsWithoutFinal(document))
     const rejected = active && highlight?.outcome === 'rejected'
     const [stroke, fill] = accepted
       ? [P.success, P.successSoft]
@@ -201,7 +202,7 @@ export function graphSvg(
           ? `<circle r="${R - 5}" fill="none" stroke="${stroke}" stroke-width="1.5"/>`
           : '') +
         `<text text-anchor="middle" dominant-baseline="central" font-family="${escapeXml(MONO)}" ` +
-        `font-size="14" fill="${P.ink}">${escapeXml(s.label)}</text></g>`
+        `font-size="14" fill="${P.ink}">${escapeXml(text)}</text></g>`
     )
   }
 
@@ -635,5 +636,118 @@ export function tapeFigureSvg(
       `<path d="M ${headX - 7} ${top - 12} L ${headX + 7} ${top - 12} L ${headX} ${top - 3} z" ` +
       `fill="${P.accent}"/>`
   )
+  return svgImage(width, height, parts.join(''), P)
+}
+
+// --- Ausgabe ------------------------------------------------------------------------
+
+const OUTPUT_CELL = 36
+const OUTPUT_ROW_GAP = 6
+const OUTPUT_HEADER = 28
+
+/** Eine Spalte der Ausgabe: Eingabesymbol (`null` = Moore-Start) und erzeugtes Stück */
+export interface OutputColumn {
+  input: string | null
+  /** Erzeugtes Stück als Text – `null`, solange die Spalte noch nicht gelesen ist */
+  output: string | null
+  /** Text, nach dem sich die Breite richtet (in einer Bildfolge das endgültige Stück) */
+  reserve?: string
+}
+
+/**
+ * Transduktor wie im Simulations-Screen: Eingabe über Ausgabe, eine Spalte pro Eingabesymbol.
+ * `current` = Spalte des letzten Schritts (-1 = keine), am Ende grün bzw. rot. Rechts oben steht
+ * die ganze Ausgabe `word`; `reserveWord` hält die Breite in einer Bildfolge gleich.
+ */
+export function outputFigureSvg(
+  columns: OutputColumn[],
+  {
+    palette = LIGHT,
+    current = -1,
+    outcome,
+    word,
+    reserveWord = word
+  }: {
+    palette?: Palette
+    current?: number
+    outcome?: 'accepted' | 'rejected'
+    word: string
+    reserveWord?: string
+  }
+): SvgImage {
+  const P = palette
+  const names = ['Eingabe', 'Ausgabe']
+  const nameWidth = Math.max(...names.map((n) => measureText(n, FONT, 12))) + 12
+  const widths = columns.map((c) =>
+    Math.max(
+      OUTPUT_CELL,
+      ...[c.input ?? 'Start', c.output ?? '', c.reserve ?? ''].map(
+        (text) => measureText(text, MONO, 15) + 2 * CELL_PAD
+      )
+    )
+  )
+  const cellsWidth = widths.reduce((sum, w) => sum + w, 0)
+  const headerWidth = measureText('Ausgabe', FONT, 12) + 24 + measureText(reserveWord, MONO, 15)
+  const width = Math.ceil(2 * MARGIN + Math.max(nameWidth + cellsWidth, headerWidth, 120))
+  const top = MARGIN + OUTPUT_HEADER
+  const height = top + 2 * OUTPUT_CELL + OUTPUT_ROW_GAP + MARGIN
+  const [accent, accentSoft] =
+    outcome === 'accepted'
+      ? [P.success, P.successSoft]
+      : outcome === 'rejected'
+        ? [P.danger, P.dangerSoft]
+        : [P.accent, P.accentSoft]
+
+  const parts: string[] = [
+    `<text x="${MARGIN}" y="${MARGIN + 14}" font-family="${escapeXml(FONT)}" font-size="12" ` +
+      `font-weight="600" fill="${P.muted}">Ausgabe</text>`,
+    `<text x="${width - MARGIN}" y="${MARGIN + 14}" text-anchor="end" ` +
+      `font-family="${escapeXml(MONO)}" font-size="15" ` +
+      `fill="${outcome ? accent : P.ink}">${escapeXml(word)}</text>`,
+    ...names.map(
+      (name, row) =>
+        `<text x="${MARGIN}" y="${top + row * (OUTPUT_CELL + OUTPUT_ROW_GAP) + OUTPUT_CELL / 2}" ` +
+        `dominant-baseline="central" font-family="${escapeXml(FONT)}" font-size="12" ` +
+        `font-weight="600" fill="${P.muted}">${name}</text>`
+    )
+  ]
+  const cell = (
+    x: number,
+    w: number,
+    row: number,
+    text: string,
+    color: string,
+    isCurrent: boolean
+  ): string => {
+    const y = top + row * (OUTPUT_CELL + OUTPUT_ROW_GAP)
+    const [stroke, fill, strokeWidth] = isCurrent
+      ? [accent, accentSoft, 2]
+      : [P.border, P.stateFill, 1]
+    return (
+      `<rect x="${x}" y="${y}" width="${w}" height="${OUTPUT_CELL}" fill="${fill}" ` +
+      `stroke="${stroke}" stroke-width="${strokeWidth}"/>` +
+      `<text x="${x + w / 2}" y="${y + OUTPUT_CELL / 2}" text-anchor="middle" ` +
+      `dominant-baseline="central" font-family="${escapeXml(text === 'Start' ? FONT : MONO)}" ` +
+      `font-size="${text === 'Start' ? 12 : 15}" fill="${color}">${escapeXml(text)}</text>`
+    )
+  }
+  // Erst die übrigen Spalten, dann die aktuelle – ihr Rahmen liegt oben
+  const left = MARGIN + nameWidth
+  const xs = widths.map((_, i) => left + widths.slice(0, i).reduce((sum, w) => sum + w, 0))
+  const order = [...columns.keys()].sort((a, b) => Number(a === current) - Number(b === current))
+  for (const i of order) {
+    const { input, output } = columns[i]
+    const isCurrent = i === current
+    const inputColor = input === null || (current >= 0 && i < current) ? P.muted : P.ink
+    const outputColor = output === 'ε' ? P.muted : isCurrent ? accent : P.ink
+    parts.push(cell(xs[i], widths[i], 0, input ?? 'Start', inputColor, isCurrent))
+    parts.push(cell(xs[i], widths[i], 1, output ?? '', outputColor, isCurrent))
+  }
+  if (columns.length === 0) {
+    parts.push(
+      cell(left, OUTPUT_CELL, 0, 'ε', P.muted, false),
+      cell(left, OUTPUT_CELL, 1, '', P.ink, false)
+    )
+  }
   return svgImage(width, height, parts.join(''), P)
 }

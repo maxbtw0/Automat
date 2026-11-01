@@ -1,0 +1,48 @@
+{
+  "format": "automat",
+  "version": 2,
+  "document": {
+    "type": "MOORE",
+    "alphabet": ["0", "1"],
+    "output": { "alphabet": ["0", "1", "2"] },
+    "graph": {
+      "states": [
+        {
+          "id": "s_r0",
+          "label": "r0",
+          "x": 140,
+          "y": 240,
+          "isStart": true,
+          "isFinal": false,
+          "output": ["0"]
+        },
+        {
+          "id": "s_r1",
+          "label": "r1",
+          "x": 400,
+          "y": 240,
+          "isStart": false,
+          "isFinal": false,
+          "output": ["1"]
+        },
+        {
+          "id": "s_r2",
+          "label": "r2",
+          "x": 660,
+          "y": 240,
+          "isStart": false,
+          "isFinal": false,
+          "output": ["2"]
+        }
+      ],
+      "transitions": [
+        { "id": "t_r0_r0", "from": "s_r0", "to": "s_r0", "labels": [{ "read": "0" }] },
+        { "id": "t_r0_r1", "from": "s_r0", "to": "s_r1", "labels": [{ "read": "1" }] },
+        { "id": "t_r1_r0", "from": "s_r1", "to": "s_r0", "labels": [{ "read": "1" }] },
+        { "id": "t_r1_r2", "from": "s_r1", "to": "s_r2", "labels": [{ "read": "0" }] },
+        { "id": "t_r2_r1", "from": "s_r2", "to": "s_r1", "labels": [{ "read": "0" }] },
+        { "id": "t_r2_r2", "from": "s_r2", "to": "s_r2", "labels": [{ "read": "1" }] }
+      ]
+    }
+  }
+}

@@ -1,7 +1,14 @@
-import { EPSILON, edgeSymbols, type AutomatonDocument, type TransitionId } from '@/model/graph'
+import type { AutomatonDocument } from '@/model/graph'
 import { StateSetSimulator } from './setSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
-import { checkFinal, checkReachability, checkStart, checkSymbols } from './validation'
+import {
+  checkCompleteness,
+  checkDeterminism,
+  checkFinal,
+  checkReachability,
+  checkStart,
+  checkSymbols
+} from './validation'
 
 /**
  * Deterministischer endlicher Automat (DEA) als Akzeptor.
@@ -27,8 +34,8 @@ export class DFA implements Automaton {
     return [
       ...checkStart(graph),
       ...checkSymbols(this.document, { allowEpsilon: false }),
-      ...this.checkDeterminism(),
-      ...this.checkCompleteness(),
+      ...checkDeterminism(graph),
+      ...checkCompleteness(this.document),
       ...checkFinal(graph),
       ...checkReachability(graph)
     ]
@@ -41,50 +48,5 @@ export class DFA implements Automaton {
   /** Ein gültiger DEA ist ein NEA mit höchstens einem aktiven Zustand und ohne ε. */
   createSimulator(word: string): Simulator {
     return new StateSetSimulator(this.document, word, { epsilon: false })
-  }
-
-  /** Pro (Zustand, Symbol) höchstens ein Folgezustand. */
-  private checkDeterminism(): ValidationIssue[] {
-    const { graph } = this.document
-    const issues: ValidationIssue[] = []
-    for (const state of graph.states) {
-      const bySymbol = new Map<string, TransitionId[]>()
-      for (const t of graph.transitions) {
-        if (t.from !== state.id) continue
-        for (const symbol of edgeSymbols(t)) {
-          if (symbol === EPSILON) continue // meldet schon checkSymbols
-          bySymbol.set(symbol, [...(bySymbol.get(symbol) ?? []), t.id])
-        }
-      }
-      for (const [symbol, transitionIds] of bySymbol) {
-        if (transitionIds.length < 2) continue
-        issues.push({
-          severity: 'error',
-          message: `Nicht deterministisch: ${state.label} mit „${symbol}“`,
-          stateIds: [state.id],
-          transitionIds
-        })
-      }
-    }
-    return issues
-  }
-
-  /** Pro (Zustand, Symbol) mindestens ein Folgezustand – sonst Warnung. */
-  private checkCompleteness(): ValidationIssue[] {
-    const { graph, alphabet } = this.document
-    const issues: ValidationIssue[] = []
-    for (const state of graph.states) {
-      const defined = new Set(
-        graph.transitions.filter((t) => t.from === state.id).flatMap(edgeSymbols)
-      )
-      const missing = alphabet.filter((a) => !defined.has(a))
-      if (missing.length === 0) continue
-      issues.push({
-        severity: 'warning',
-        message: `Unvollständig: ${state.label} ohne ${missing.map((a) => `„${a}“`).join(', ')}`,
-        stateIds: [state.id]
-      })
-    }
-    return issues
   }
 }

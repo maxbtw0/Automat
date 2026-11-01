@@ -6,14 +6,18 @@ import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import { ALPHABET_TOOLS, type AlphabetTool } from '@/editor/alphabetTools'
 import {
   labelSymbols,
+  outputSettings,
+  outputsOnStates,
   stackSettings,
+  stateOutput,
   tapeSettings,
+  usesOutput,
   usesStack,
   usesTape,
   validateSymbol,
   type AlphabetKind,
-  type StackAcceptance,
-  type TransitionEdge
+  type AutomatonDocument,
+  type StackAcceptance
 } from '@/model/graph'
 import { askChoice } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
@@ -24,33 +28,50 @@ import { classNames } from '@/utils/dom'
 const sameSymbolSet = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((s) => b.includes(s))
 
-/** Anzahl der Übergänge, deren Regeln das Symbol benutzen */
 const SYMBOL_NAMES: Record<AlphabetKind, string> = {
   input: 'Symbol',
   stack: 'Stacksymbol',
-  tape: 'Bandsymbol'
+  tape: 'Bandsymbol',
+  output: 'Ausgabesymbol'
 }
 
-const usageCount = (transitions: TransitionEdge[], symbol: string, kind: AlphabetKind): number =>
-  transitions.filter((t) => t.labels.some((l) => labelSymbols(l, kind).includes(symbol))).length
+/** Moore: Ausgaben hängen an Zuständen – gezählt werden dann Zustände statt Übergänge */
+const countsStates = (document: AutomatonDocument, kind: AlphabetKind): boolean =>
+  kind === 'output' && outputsOnStates(document.type)
+
+/** Anzahl der Übergänge, deren Regeln das Symbol benutzen (Moore-Ausgabe: der Zustände) */
+const usageCount = (document: AutomatonDocument, symbol: string, kind: AlphabetKind): number =>
+  countsStates(document, kind)
+    ? document.graph.states.filter((s) => stateOutput(s).includes(symbol)).length
+    : document.graph.transitions.filter((t) =>
+        t.labels.some((l) => labelSymbols(l, kind).includes(symbol))
+      ).length
 
 const TITLES: Record<AlphabetKind, string> = {
   input: 'Eingabealphabet Σ',
   stack: 'Stackalphabet Γ',
-  tape: 'Bandalphabet Γ'
+  tape: 'Bandalphabet Γ',
+  output: 'Ausgabealphabet Δ'
 }
 
 /**
  * Alphabet-Screen. Endliche Automaten: nur Σ mit der Werkzeugleiste links. Kellerautomaten:
  * Σ und Γ nebeneinander, jedes mit eigener Werkzeugleiste, dazu Stack-Startsymbol und Akzeptanz.
- * Turingmaschine: Σ und Bandalphabet Γ ⊇ Σ nebeneinander, dazu das Blank.
+ * Turingmaschine: Σ und Bandalphabet Γ ⊇ Σ nebeneinander, dazu das Blank. Transduktoren: Σ und
+ * Ausgabealphabet Δ nebeneinander.
  */
 export function AlphabetScreen() {
   const document = useEditorStore((s) => s.document)
   const hasStack = usesStack(document.type)
   const hasTape = usesTape(document.type)
-  /** Zweites Alphabet neben Σ – `null` bei endlichen Automaten */
-  const second: AlphabetKind | null = hasStack ? 'stack' : hasTape ? 'tape' : null
+  /** Zweites Alphabet neben Σ – `null` bei endlichen Akzeptoren */
+  const second: AlphabetKind | null = hasStack
+    ? 'stack'
+    : hasTape
+      ? 'tape'
+      : usesOutput(document.type)
+        ? 'output'
+        : null
   const stack = stackSettings(document)
   const tape = tapeSettings(document)
   const { addSymbol, renameSymbol, deleteSymbol, sortAlphabet, applyAlphabetPreset } =
@@ -58,8 +79,14 @@ export function AlphabetScreen() {
 
   const screenRef = useRef<HTMLDivElement>(null)
 
-  const alphabetOf = (k: AlphabetKind): string[] =>
-    k === 'input' ? document.alphabet : k === 'tape' ? tape.alphabet : stack.alphabet
+  const alphabetOf = (k: AlphabetKind, doc = document): string[] =>
+    k === 'input'
+      ? doc.alphabet
+      : k === 'tape'
+        ? tapeSettings(doc).alphabet
+        : k === 'output'
+          ? outputSettings(doc).alphabet
+          : stackSettings(doc).alphabet
 
   /** Zuletzt angelegtes Symbol – dessen Eingabefeld bekommt sofort den Fokus. */
   const [justAdded, setJustAdded] = useState<string | null>(null)
@@ -96,9 +123,12 @@ export function AlphabetScreen() {
       setError(`„${symbol}“ ist in Σ`)
       return
     }
-    const count = usageCount(document.graph.transitions, symbol, kind)
+    const count = usageCount(document, symbol, kind)
     if (count > 0) {
-      const where = count === 1 ? 'einem Übergang' : `${count} Übergängen`
+      const [one, many] = countsStates(document, kind)
+        ? ['einem Zustand', 'Zuständen']
+        : ['einem Übergang', 'Übergängen']
+      const where = count === 1 ? one : `${count} ${many}`
       const choice = await askChoice({
         title: `„${symbol}“ löschen?`,
         detail: `Wird in ${where} benutzt und dort ebenfalls entfernt.`,
@@ -109,13 +139,7 @@ export function AlphabetScreen() {
     }
     deleteSymbol(index, kind)
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
-    const doc = useEditorStore.getState().document
-    const rest =
-      kind === 'input'
-        ? doc.alphabet
-        : kind === 'tape'
-          ? tapeSettings(doc).alphabet
-          : stackSettings(doc).alphabet
+    const rest = alphabetOf(kind, useEditorStore.getState().document)
     select(kind, rest[Math.min(index, rest.length - 1)] ?? null)
   }
 
@@ -169,8 +193,9 @@ export function AlphabetScreen() {
   const handleRename = (k: AlphabetKind, oldSymbol: string, input: string): boolean => {
     const newSymbol = input.trim()
     let problem = validateSymbol(alphabetOf(k), newSymbol, oldSymbol)
-    // → und / trennen in Stack- und Bandregeln die Seiten
-    if (!problem && k !== 'input' && /[→/]/.test(newSymbol)) problem = '→ und / nicht erlaubt'
+    // → und / trennen in Stack-, Band- und Mealy-Regeln die Seiten
+    const separates = k !== 'input' || usesOutput(document.type)
+    if (!problem && separates && /[→/]/.test(newSymbol)) problem = '→ und / nicht erlaubt'
     // „_“ steht in Bandregeln für das Blank
     if (!problem && hasTape && newSymbol === '_') problem = '„_“ steht für das Blank'
     // Turingmaschine: Σ ⊆ Γ – ein Σ-Symbol darf kein anderes Bandsymbol treffen und umgekehrt
@@ -204,12 +229,13 @@ export function AlphabetScreen() {
   const EMPTY: Record<AlphabetKind, string> = {
     input: 'noch kein Alphabet festgelegt',
     stack: 'noch kein Stackalphabet festgelegt',
-    tape: 'noch kein Bandalphabet festgelegt'
+    tape: 'noch kein Bandalphabet festgelegt',
+    output: 'noch kein Ausgabealphabet festgelegt'
   }
 
   const table = (k: AlphabetKind) => {
     const alphabet = alphabetOf(k)
-    const hasMarker = k !== 'input'
+    const hasMarker = k === 'stack' || k === 'tape'
     const columns = hasMarker ? 4 : 3
     return (
       <table className="data-table">
@@ -218,7 +244,9 @@ export function AlphabetScreen() {
             <th className="is-index">#</th>
             <th>Symbol</th>
             {hasMarker && <th className="is-check">{marker.title}</th>}
-            <th className="is-number">Übergänge</th>
+            <th className="is-number">
+              {countsStates(document, k) ? 'Zustände' : 'Übergänge'}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -263,7 +291,7 @@ export function AlphabetScreen() {
                   />
                 </td>
               )}
-              <td className="is-number">{usageCount(document.graph.transitions, symbol, k)}</td>
+              <td className="is-number">{usageCount(document, symbol, k)}</td>
             </tr>
           ))}
         </tbody>

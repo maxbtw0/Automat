@@ -131,7 +131,9 @@ const TYPE_PAGES: Record<AutomatonType, { title: string; Page: () => ReactNode }
   NFA: { title: 'Nichtdeterministischer endlicher Akzeptor (NEA)', Page: NfaPage },
   DPDA: { title: 'Deterministischer Kellerautomat (DKA)', Page: DpdaPage },
   NPDA: { title: 'Nichtdeterministischer Kellerautomat (NKA)', Page: NpdaPage },
-  TM: { title: 'Turingmaschine (TM)', Page: TuringPage }
+  TM: { title: 'Turingmaschine (TM)', Page: TuringPage },
+  MEALY: { title: 'Mealy-Automat', Page: MealyPage },
+  MOORE: { title: 'Moore-Automat', Page: MoorePage }
 }
 
 function DfaPage() {
@@ -388,6 +390,123 @@ function TuringPage() {
   )
 }
 
+function TransducerSection() {
+  return (
+    <Section title="Transduktor">
+      <p>
+        Ein Transduktor ist ein endlicher Automat mit Ausgabe. Er entscheidet nicht über ein Wort,
+        sondern übersetzt es: Beim Lesen von w ∈ X* schreibt er nach und nach ein Ausgabewort aus
+        Y*. Endzustände gibt es nicht, das Ergebnis ist die Ausgabe. Wie beim DEA ist der nächste
+        Zustand immer eindeutig.
+      </p>
+    </Section>
+  )
+}
+
+/** X, Y, Z, z₀ – bei Mealy und Moore gleich, nur λ unterscheidet sich. */
+function transducerParts(): [ReactNode, ReactNode][] {
+  return [
+    ['X', 'Eingabealphabet'],
+    ['Y', 'Ausgabealphabet'],
+    ['Z', 'endliche Menge aller Zustände'],
+    [<>{Z0} ∈ Z</>, 'Anfangszustand'],
+    ['δ: Z × X → Z', 'Übergangsfunktion']
+  ]
+}
+
+function MealyPage() {
+  return (
+    <>
+      <TransducerSection />
+      <Section title="Definition">
+        <Formula>
+          A = (X, Y, Z, {Z0}, δ, λ)
+        </Formula>
+        <Parts rows={[...transducerParts(), ['λ: Z × X → Y*', 'Ausgabefunktion']]} />
+      </Section>
+      <Section title="Ausgabe am Übergang">
+        <p>
+          Die Ausgabe hängt vom Zustand <em>und</em> vom gelesenen Zeichen ab: Liest der Automat
+          in z das Zeichen x, gibt er λ(z, x) aus und wechselt nach δ(z, x). Im Zustandsdiagramm
+          steht dafür am Übergang <code>x/λ(z, x)</code>.
+        </p>
+        <Parts
+          rows={[
+            [<code key="a">a/1</code>, 'a lesen, 1 ausgeben'],
+            [<code key="b">b/01</code>, 'b lesen, 01 ausgeben'],
+            [<code key="e">b/ε</code>, 'b lesen, nichts ausgeben']
+          ]}
+        />
+      </Section>
+      <Section title="Arbeitsweise">
+        <p>
+          Der Automat startet in {Z0} und liest w = x<sub>1</sub>…x<sub>n</sub> von links nach
+          rechts. Die Ausgabe ist die Verkettung der einzelnen Stücke:
+        </p>
+        <Formula>
+          λ(z<sub>0</sub>, x<sub>1</sub>) λ(z<sub>1</sub>, x<sub>2</sub>) … λ(z<sub>n−1</sub>, x
+          <sub>n</sub>) mit z<sub>i</sub> = δ(z<sub>i−1</sub>, x<sub>i</sub>)
+        </Formula>
+        <p>
+          Fehlt für ein Zeichen der Übergang, bricht die Übersetzung dort ab. Die Ausgabe bis
+          dahin bleibt stehen.
+        </p>
+      </Section>
+      <Section title="Mealy und Moore">
+        <p>
+          Zu jedem Mealy-Automaten gibt es einen Moore-Automaten mit derselben Übersetzung: Man
+          teilt jeden Zustand z in Paare (z, w) auf: w ist die Ausgabe, mit der man z betritt, und
+          wird zur Ausgabe des neuen Zustands. Dabei können mehr Zustände entstehen. Umgekehrt
+          gibt jede Regel aus, was der Moore-Automat im Zielzustand ausgibt.
+        </p>
+      </Section>
+    </>
+  )
+}
+
+function MoorePage() {
+  return (
+    <>
+      <TransducerSection />
+      <Section title="Definition">
+        <Formula>
+          A = (X, Y, Z, {Z0}, δ, λ)
+        </Formula>
+        <Parts rows={[...transducerParts(), ['λ: Z → Y*', 'Ausgabefunktion']]} />
+      </Section>
+      <Section title="Ausgabe am Zustand">
+        <p>
+          Die Ausgabe hängt nur vom Zustand ab: Jedes Mal, wenn der Automat einen Zustand z
+          betritt, gibt er λ(z) aus. Im Zustandsdiagramm steht dafür im Zustand{' '}
+          <code>z/λ(z)</code>, z. B. <code>z1/1</code>.
+        </p>
+      </Section>
+      <Section title="Arbeitsweise">
+        <p>
+          Schon beim Start gibt der Automat λ({Z0}) aus. Danach liest er w = x<sub>1</sub>…x
+          <sub>n</sub> von links nach rechts und gibt nach jedem Zeichen die Ausgabe des neuen
+          Zustands aus:
+        </p>
+        <Formula>
+          λ(z<sub>0</sub>) λ(z<sub>1</sub>) … λ(z<sub>n</sub>) mit z<sub>i</sub> = δ(z
+          <sub>i−1</sub>, x<sub>i</sub>)
+        </Formula>
+        <p>
+          Bei n Zeichen gibt es also n + 1 Ausgabestücke. Fehlt für ein Zeichen der Übergang,
+          bricht die Übersetzung dort ab.
+        </p>
+      </Section>
+      <Section title="Moore und Mealy">
+        <p>
+          Ein Moore-Automat lässt sich in einen Mealy-Automaten umwandeln: Jede Regel gibt aus, was
+          ihr Zielzustand ausgibt. Nur λ({Z0}) vor dem ersten Zeichen kann ein Mealy-Automat nicht
+          erzeugen. Bis auf dieses erste Stück sind beide Übersetzungen gleich.
+        </p>
+      </Section>
+    </>
+  )
+}
+
 // ---------- Speichern ----------
 
 function SavingPage() {
@@ -415,7 +534,8 @@ function SavingPage() {
               <code key="t">type</code>,
               <>
                 <code>"DFA"</code> (DEA), <code>"NFA"</code> (NEA), <code>"DPDA"</code> (DKA),{' '}
-                <code>"NPDA"</code> (NKA) oder <code>"TM"</code>
+                <code>"NPDA"</code> (NKA), <code>"TM"</code>, <code>"MEALY"</code> oder{' '}
+                <code>"MOORE"</code>
               </>
             ],
             [
@@ -426,7 +546,8 @@ function SavingPage() {
             ],
             [<code key="g">graph</code>, 'Zustände und Übergänge'],
             [<code key="s">stack</code>, 'nur beim Kellerautomaten'],
-            [<code key="p">tape</code>, 'nur bei der Turingmaschine']
+            [<code key="p">tape</code>, 'nur bei der Turingmaschine'],
+            [<code key="o">output</code>, 'nur bei Mealy und Moore']
           ]}
         />
       </Section>
@@ -450,7 +571,13 @@ function SavingPage() {
                 Anfangszustand – genau einer hat <code>true</code>
               </>
             ],
-            [<code key="f">isFinal</code>, 'Endzustand']
+            [<code key="f">isFinal</code>, 'Endzustand (bei Mealy und Moore immer false)'],
+            [
+              <code key="o">output</code>,
+              <>
+                nur Moore: Ausgabe λ(z) als Liste, z. B. <code>["1"]</code>, <code>[]</code> = ε
+              </>
+            ]
           ]}
         />
       </Section>
@@ -495,17 +622,26 @@ function SavingPage() {
                 <code>{'{ "read": "a", "write": "X", "move": "R" }'}</code> – <code>move</code>{' '}
                 ist <code>"L"</code>, <code>"R"</code> oder <code>"N"</code>
               </>
-            ]
+            ],
+            [
+              'Mealy',
+              <>
+                <code>{'{ "read": "a", "output": ["0", "1"] }'}</code>, <code>[]</code> = ε
+              </>
+            ],
+            ['Moore', <code key="m">{'{ "read": "a" }'}</code>]
           ]}
         />
       </Section>
-      <Section title="stack und tape">
-        <pre className="help-code">{`"stack": { "alphabet": ["A", "#"], "start": "#", "acceptance": "final" }
-"tape":  { "alphabet": ["a", "b", "X", "#"], "blank": "#" }`}</pre>
+      <Section title="stack, tape und output">
+        <pre className="help-code">{`"stack":  { "alphabet": ["A", "#"], "start": "#", "acceptance": "final" }
+"tape":   { "alphabet": ["a", "b", "X", "#"], "blank": "#" }
+"output": { "alphabet": ["0", "1"] }`}</pre>
         <p>
           <code>stack.alphabet</code> ist Γ, <code>start</code> das Bodensymbol,{' '}
           <code>acceptance</code> <code>"final"</code> (Endzustand) oder <code>"empty"</code>{' '}
-          (leerer Stack). <code>tape.alphabet</code> ist Γ und muss X und das Blank enthalten.
+          (leerer Stack). <code>tape.alphabet</code> ist Γ und muss X und das Blank enthalten.{' '}
+          <code>output.alphabet</code> ist das Ausgabealphabet Y.
         </p>
       </Section>
       <Section title="Beispiel: DEA für eine gerade Anzahl a">
