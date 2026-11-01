@@ -9,6 +9,9 @@ import {
   parseLabels,
   parseTuringRule
 } from './labels'
+import { DEFAULT_SIMULATION } from '@shared/simulationSettings'
+import { UndecidedError } from './errors'
+import { setSimulationLimits } from './limits'
 import { createAutomaton } from './registry'
 import { STEP_LIMIT, Tape, TuringSimulator } from './tmSimulator'
 import type { SimulationStep, TapeSnapshot } from './types'
@@ -329,6 +332,26 @@ describe('Turingmaschine – Bandverlauf', () => {
       expect(sim.run().steps).toHaveLength(count)
       // früher: 1 + 2 + … + count Zellen (2000 Schritte = 2 003 000)
       expect(sim.storedTapeCells).toBeLessThanOrEqual(3 * count + 64)
+    }
+  })
+})
+
+describe('Turingmaschine – accepts am Schrittlimit', () => {
+  // Liest jedes a nach rechts, hält beim Blank im Endzustand: „aa“ braucht drei Schritte
+  const doc = buildDocument('TM', ['a'], { start: 'q0', finals: ['q1'] }, [
+    ['q0', 'a → a, R', 'q0'],
+    ['q0', '# → #, N', 'q1']
+  ])
+
+  it('meldet unentschieden statt false, wenn das Limit zu knapp ist', () => {
+    try {
+      setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: 2 })
+      expect(() => createAutomaton(doc).accepts('aa')).toThrow(UndecidedError)
+      expect(createAutomaton(doc).accepts('a')).toBe(true)
+      setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: 3 })
+      expect(createAutomaton(doc).accepts('aa')).toBe(true)
+    } finally {
+      setSimulationLimits(DEFAULT_SIMULATION)
     }
   })
 })

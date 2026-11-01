@@ -307,6 +307,8 @@ export function parseRegex(input: string, alphabet: string[] = []): Regex {
       const escaped = input.codePointAt(pos + 1)
       if (escaped === undefined) return fail(`„${ESCAPE}“ ohne Zeichen danach`)
       const text = String.fromCodePoint(escaped)
+      // ε liegt nie in Σ – als Symbol würde es im NEA zum ε-Übergang
+      if (text === EPSILON) fail(`„${ESCAPE}${EPSILON}“: ε ist kein Symbol`)
       pos += 1 + text.length
       return symbol(text)
     }

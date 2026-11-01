@@ -5,6 +5,7 @@ import {
   type AutomatonType,
   type TransitionId
 } from '@/model/graph'
+import { UndecidedError } from './errors'
 import { asTuring } from './labels'
 import { TuringSimulator } from './tmSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
@@ -40,8 +41,14 @@ export class TuringMachine implements Automaton {
     ]
   }
 
+  /** Wirft `UndecidedError`, wenn der Lauf an einem Limit abbricht. */
   accepts(word: string): boolean {
-    return this.createSimulator(word).run().accepted
+    const simulator = this.createSimulator(word)
+    const { accepted } = simulator.run()
+    if (simulator.undecided) {
+      throw new UndecidedError(word, simulator.abortReason ?? 'Limit erreicht')
+    }
+    return accepted
   }
 
   createSimulator(word: string): Simulator {

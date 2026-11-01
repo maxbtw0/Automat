@@ -301,8 +301,15 @@ function DpdaPage() {
           <li>gibt es einen ε-Übergang δ(z, ε, A), dann keinen Übergang δ(z, x, A) mit x ∈ X.</li>
         </ul>
         <p>
-          DKAs akzeptieren die deterministisch kontextfreien Sprachen – z. B. a<sup>n</sup>b
-          <sup>n</sup> oder korrekt geklammerte Ausdrücke, aber nicht alle Palindrome.
+          DKAs mit Endzustand akzeptieren die deterministisch kontextfreien Sprachen – z. B. a
+          <sup>n</sup>b<sup>n</sup> oder korrekt geklammerte Ausdrücke, aber nicht alle
+          Palindrome.
+        </p>
+        <p>
+          Mit leerem Stack sind es weniger: nur die <em>präfixfreien</em> davon, in denen kein Wort
+          echter Anfang eines anderen ist. Ist der Stack nach w leer, passt keine Regel mehr. Weil
+          der Lauf eindeutig ist, erreicht er auch bei jeder Verlängerung wv diesen leeren Stack und
+          hängt dort, bevor v gelesen ist. {'{'}a, aa{'}'} geht daher nur mit Endzustand.
         </p>
       </Section>
     </>

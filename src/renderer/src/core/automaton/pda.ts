@@ -5,6 +5,7 @@ import {
   type AutomatonType,
   type TransitionId
 } from '@/model/graph'
+import { UndecidedError } from './errors'
 import { asPushdown, formatLabel, type PushdownLabel } from './labels'
 import { PushdownSimulator } from './pdaSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
@@ -52,8 +53,14 @@ export class PushdownAutomaton implements Automaton {
     ]
   }
 
+  /** Wirft `UndecidedError`, wenn der Lauf an einem Limit abbricht. */
   accepts(word: string): boolean {
-    return this.createSimulator(word).run().accepted
+    const simulator = this.createSimulator(word)
+    const { accepted } = simulator.run()
+    if (simulator.undecided) {
+      throw new UndecidedError(word, simulator.abortReason ?? 'Limit erreicht')
+    }
+    return accepted
   }
 
   createSimulator(word: string): Simulator {
@@ -67,7 +74,7 @@ export class PushdownAutomaton implements Automaton {
     return [{ severity: 'error', message: `Stack-Startsymbol „${start}“ nicht in Γ` }]
   }
 
-  /** Eingabe ∈ Σ ∪ {ε}, Top of Stack ∈ Γ (nie ε), Push ⊆ Γ; Übergänge ohne Regel. */
+  /** Eingabe ∈ Σ ∪ {ε}, Top of Stack ∈ Γ (nie ε), Push ∈ Γ* (ohne ε); Übergänge ohne Regel. */
   private checkLabels(): ValidationIssue[] {
     const { alphabet } = this.document
     const gamma = stackSettings(this.document).alphabet
@@ -83,6 +90,8 @@ export class PushdownAutomaton implements Automaton {
           messages.add(`„${read}“ nicht im Alphabet`)
         }
         if (pop === EPSILON) messages.add('ε als Top of Stack nicht erlaubt')
+        // Das leere Push-Wort ist [] – ein Element „ε“ läge sonst wirklich auf dem Stack
+        if (push.includes(EPSILON)) messages.add('ε im Push-Wort nicht erlaubt')
         for (const symbol of [pop, ...push]) {
           if (symbol !== EPSILON && !gamma.includes(symbol)) {
             messages.add(`„${symbol}“ nicht im Stackalphabet`)

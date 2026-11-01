@@ -96,7 +96,10 @@ export interface Automaton {
   readonly type: AutomatonType
   /** Prüft den gezeichneten Automaten auf Fehler (z. B. Determinismus beim DEA). */
   validate(): ValidationIssue[]
-  /** Schnelltest: Wird das Wort akzeptiert? */
+  /**
+   * Schnelltest: Wird das Wort akzeptiert? Bricht der Lauf an einem Limit ab (TM, Kellerautomat),
+   * ist das unentschieden: dann `UndecidedError` statt `false`.
+   */
   accepts(word: string): boolean
   createSimulator(word: string): Simulator
 }

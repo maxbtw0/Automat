@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { changeDocumentType, hasStackOperations } from '@/core/algorithms/changeType'
+import { DEFAULT_SIMULATION } from '@shared/simulationSettings'
+import { UndecidedError } from './errors'
+import { setSimulationLimits } from './limits'
 import { createAutomaton } from './registry'
 import { formatStack } from './labels'
 import { STACK_LIMIT, searchPushdown } from './pdaSimulator'
@@ -213,6 +216,14 @@ describe('Kellerautomat – Prüfung', () => {
     ]
     expect(errors(doc)).toEqual(['ε als Top of Stack nicht erlaubt'])
   })
+
+  it('ε im Push-Wort ist nicht erlaubt (leeres Wort = [], z. B. aus Dateien)', () => {
+    const doc = buildDocument('NPDA', ['a'], { start: 'q0', finals: ['q0'] }, [])
+    doc.graph.transitions = [
+      { id: 't0', from: 'q0', to: 'q0', labels: [{ read: 'a', pop: '#', push: ['ε'] }] }
+    ]
+    expect(errors(doc)).toEqual(['ε im Push-Wort nicht erlaubt'])
+  })
 })
 
 describe('Typwechsel', () => {
@@ -260,5 +271,30 @@ describe('Push mit mehreren Symbolen', () => {
     const [, step] = [sim.reset(), sim.step()]
     expect(step.stack).toEqual(['#', 'C', 'B', 'A'])
     expect(formatStack(step.stack ?? [])).toBe('ABC#')
+  })
+})
+
+describe('Kellerautomat – accepts am Limit', () => {
+  // „ab“ braucht kurz Stackhöhe 2
+  const doc = buildDocument(
+    'NPDA',
+    ['a', 'b'],
+    { start: 'q0', finals: ['q2'], stack: ['A', '#'] },
+    [
+      ['q0', 'a, # → A#', 'q1'],
+      ['q1', 'b, A → ε', 'q2']
+    ]
+  )
+
+  it('meldet unentschieden statt false, wenn die Stackhöhe zu knapp ist', () => {
+    try {
+      setSimulationLimits({ ...DEFAULT_SIMULATION, pdaStackLimit: 1 })
+      expect(() => createAutomaton(doc).accepts('ab')).toThrow(UndecidedError)
+      setSimulationLimits({ ...DEFAULT_SIMULATION, pdaStackLimit: 2 })
+      expect(createAutomaton(doc).accepts('ab')).toBe(true)
+      expect(createAutomaton(doc).accepts('b')).toBe(false)
+    } finally {
+      setSimulationLimits(DEFAULT_SIMULATION)
+    }
   })
 })

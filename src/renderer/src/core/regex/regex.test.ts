@@ -126,6 +126,10 @@ describe('Symbole mit Operator-Zeichen', () => {
     expect(() => parseRegex('a\\')).toThrow('„\\“ ohne Zeichen danach')
   })
 
+  it('\\ε ist ein Fehler: ε ist das leere Wort, kein Symbol', () => {
+    expect(() => parseRegex('a\\ε')).toThrow('ε ist kein Symbol')
+  })
+
   it('liest Zeichen außerhalb der Basisebene als ein Symbol (Emoji)', () => {
     expect(parseRegex('😀*')).toEqual(star(symbol('😀')))
     expect(parseRegex('a😀')).toEqual(concat(symbol('a'), symbol('😀')))
