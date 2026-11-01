@@ -92,7 +92,12 @@ export function Canvas({ readOnly = false }: CanvasProps) {
 
   const geometries = useMemo(() => edgeGeometries(doc.graph), [doc.graph])
 
-  const activeStates = useMemo(() => new Set(highlight?.activeStateIds), [highlight])
+  // Hervorgehoben: der Pfad (NEA) bzw. alle aktiven Zustände; übrige aktive nur dezent
+  const activeStates = useMemo(
+    () => new Set(highlight?.pathStateIds ?? highlight?.activeStateIds),
+    [highlight]
+  )
+  const reachableStates = useMemo(() => new Set(highlight?.activeStateIds), [highlight])
   const activeTransitions = useMemo(() => new Set(highlight?.usedTransitionIds), [highlight])
   const pulse = highlight?.pulse
   /**
@@ -746,6 +751,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
               state={s}
               selected={!readOnly && isSelected(selection, 'state', s.id)}
               active={activeStates.has(s.id)}
+              reachable={reachableStates.has(s.id)}
               outcome={highlight?.outcome}
               acceptAny={endsWithoutFinal(doc)}
               text={stateText(s, doc)}

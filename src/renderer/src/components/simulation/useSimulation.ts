@@ -221,6 +221,7 @@ export function useSimulation(): SimulationControls {
     shownRef.current = { step: current, pulse }
     setHighlight({
       activeStateIds: current.activeStateIds,
+      pathStateIds: current.pathStateIds,
       usedTransitionIds: current.usedTransitionIds,
       outcome: status === 'accepted' || status === 'rejected' ? status : undefined,
       pulse

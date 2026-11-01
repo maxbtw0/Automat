@@ -130,7 +130,9 @@ export function graphSvg(
   const { states, transitions } = document.graph
   if (states.length === 0) return svgImage(240, 120, '', P)
 
-  const activeStates = new Set(highlight?.activeStateIds)
+  // Hervorgehoben: der Pfad (NEA) bzw. alle aktiven Zustände; übrige aktive gestrichelt
+  const activeStates = new Set(highlight?.pathStateIds ?? highlight?.activeStateIds)
+  const reachableStates = new Set(highlight?.activeStateIds)
   const activeTransitions = new Set(highlight?.usedTransitionIds)
 
   // Begrenzung: Zustände, Startpfeile, Kantenbeschriftungen
@@ -184,23 +186,26 @@ export function graphSvg(
     const accepted =
       active && highlight?.outcome === 'accepted' && (s.isFinal || endsWithoutFinal(document))
     const rejected = active && highlight?.outcome === 'rejected'
+    const reachable = !active && reachableStates.has(s.id)
     const [stroke, fill] = accepted
       ? [P.success, P.successSoft]
       : rejected
         ? [P.danger, P.dangerSoft]
-        : active
+        : active || reachable
           ? [P.accent, P.accentSoft]
           : [P.ink, P.stateFill]
     const width = active ? 3 : 2
+    const dash = reachable ? ' stroke-dasharray="5 4"' : ''
     nodes.push(
       `<g transform="translate(${s.x} ${s.y})">` +
         (s.isStart
           ? `<path d="M ${-R - 36} 0 L ${-R} 0" stroke="${P.ink}" stroke-width="2" ` +
             `marker-end="url(#${idPrefix}-arrow-start)"/>`
           : '') +
-        `<circle r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="${width}"/>` +
+        `<circle r="${R}" fill="${fill}" stroke="${stroke}" stroke-width="${width}"${dash}/>` +
         (s.isFinal
-          ? `<circle r="${R - 5}" fill="none" stroke="${stroke}" stroke-width="1.5"/>`
+          ? `<circle r="${R - 5}" fill="none" stroke="${reachable ? P.ink : stroke}" ` +
+            `stroke-width="1.5"/>`
           : '') +
         `<text text-anchor="middle" dominant-baseline="central" font-family="${escapeXml(MONO)}" ` +
         `font-size="14" fill="${P.ink}">${escapeXml(text)}</text></g>`

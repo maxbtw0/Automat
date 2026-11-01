@@ -162,8 +162,8 @@ function layoutFor(format: ExportFormat, palette: Palette): Layout {
 }
 
 function highlightOf(step: SimulationStep, outcome?: 'accepted' | 'rejected') {
-  const { activeStateIds, usedTransitionIds } = step
-  return { activeStateIds, usedTransitionIds, outcome }
+  const { activeStateIds, pathStateIds, usedTransitionIds } = step
+  return { activeStateIds, pathStateIds, usedTransitionIds, outcome }
 }
 
 function stepCaption(step: SimulationStep): string {

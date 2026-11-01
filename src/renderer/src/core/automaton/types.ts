@@ -38,8 +38,14 @@ export interface TapeSnapshot {
 export interface SimulationStep {
   /** 0 = Startkonfiguration, danach 1, 2, … */
   index: number
-  /** Aktuelle Zustände (beim DEA genau einer, beim NEA ggf. mehrere) – werden im Canvas hervorgehoben */
+  /** Aktuelle Zustände (beim DEA genau einer, beim NEA die ganze Menge δ*(q0, gelesen)) */
   activeStateIds: StateId[]
+  /**
+   * NEA/DEA: die aktiven Zustände auf dem erklärten Pfad (akzeptierend bzw. am weitesten
+   * kommend) – Canvas und Tabelle heben sie hervor, die übrigen aktiven nur dezent. Fehlt es,
+   * sind alle aktiven Zustände hervorgehoben.
+   */
+  pathStateIds?: StateId[]
   /** Im letzten Schritt benutzte Übergänge – werden im Canvas hervorgehoben */
   usedTransitionIds: TransitionId[]
   /** Bereits gelesener Teil des Eingabeworts */

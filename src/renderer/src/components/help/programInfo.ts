@@ -24,7 +24,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Der NEA liest ein „ε“ im Eingabewort nicht mehr über einen ε-Übergang',
       'Export sehr langer Simulationen funktioniert wieder, auch als PDF',
       'Leerzeichen trennen Symbole im Eingabewort: bei Σ = {a, b, ab} ist „a b“ zwei Symbole',
-      'Reguläre Ausdrücke lehnen „\\ε“ ab, Kellerautomaten melden „ε“ im Push-Wort als Fehler'
+      'Reguläre Ausdrücke lehnen „\\ε“ ab, Kellerautomaten melden „ε“ im Push-Wort als Fehler',
+      'NEA-Simulation zeigt die ganze Zustandsmenge, den erklärten Pfad hervorgehoben'
     ]
   },
   {

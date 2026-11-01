@@ -1224,6 +1224,12 @@ h4 {
   stroke: var(--accent);
   stroke-width: 3;
 }
+/* NEA: aktiv, aber nicht auf dem hervorgehobenen Pfad */
+.state.is-reachable .state-circle {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-dasharray: 5 4;
+}
 /* Ende der Simulation: aktive Zustände grün (akzeptiert) bzw. rot (verworfen) */
 .state.is-accepted .state-circle,
 .state.is-accepted .state-final-ring {

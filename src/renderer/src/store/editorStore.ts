@@ -103,6 +103,8 @@ export type InlineEdit =
 /** Hervorhebung im Canvas, z. B. während der Simulation. */
 export interface Highlight {
   activeStateIds: StateId[]
+  /** Hervorgehobene Teilmenge von `activeStateIds` (NEA-Pfad), die übrigen nur dezent */
+  pathStateIds?: StateId[]
   usedTransitionIds: TransitionId[]
   /** Am Ende einer Simulation: färbt die aktiven Zustände grün bzw. rot */
   outcome?: 'accepted' | 'rejected'

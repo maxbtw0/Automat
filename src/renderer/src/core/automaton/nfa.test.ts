@@ -57,9 +57,11 @@ describe('NFA-Simulator', () => {
     expect(new Set(new NFA(withEpsilon).createSimulator('a').reset().activeStateIds)).toEqual(
       new Set(['q0', 'q1'])
     )
-    // „ba“: q1 kann das b nicht lesen → am Anfang nur q0 hervorgehoben
+    // „ba“: q1 kann das b nicht lesen → am Anfang nur q0 hervorgehoben, aktiv sind beide
     const sim = new NFA(withEpsilon).createSimulator('ba')
-    expect(sim.reset().activeStateIds).toEqual(['q0'])
+    const start = sim.reset()
+    expect(start.pathStateIds).toEqual(['q0'])
+    expect(new Set(start.activeStateIds)).toEqual(new Set(['q0', 'q1']))
 
     const { steps, accepted } = sim.run()
     expect(steps).toHaveLength(2)
@@ -76,12 +78,19 @@ describe('NFA-Simulator', () => {
   })
 })
 
-describe('NFA-Simulator zeigt nur benutzte Zweige', () => {
+describe('NFA-Simulator hebt nur benutzte Zweige hervor', () => {
   const trace = (word: string) =>
     new NFA(endsWithAb)
       .createSimulator(word)
       .run()
-      .steps.map((step) => [step.activeStateIds.join(','), step.usedTransitionIds.join(',')])
+      .steps.map((step) => [(step.pathStateIds ?? []).join(','), step.usedTransitionIds.join(',')])
+
+  it('aktiv ist trotzdem die ganze Menge δ*(q0, gelesen)', () => {
+    // nach dem ersten a von „aab“ sind q0 und q1 erreichbar, auf dem Pfad liegt nur q0
+    const [first] = new NFA(endsWithAb).createSimulator('aab').run().steps
+    expect(new Set(first.activeStateIds)).toEqual(new Set(['q0', 'q1']))
+    expect(first.pathStateIds).toEqual(['q0'])
+  })
 
   it('akzeptiert: nur der akzeptierende Pfad', () => {
     // q0 –a→ q0 –a→ q1 –b→ q2; t0 = q0→q0, t1 = q0→q1, t2 = q1→q2

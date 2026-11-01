@@ -7,6 +7,8 @@ interface StateNodeViewProps {
   state: StateNode
   selected: boolean
   active: boolean
+  /** Aktiv, aber nicht auf dem hervorgehobenen Pfad (NEA) – nur dezent markiert */
+  reachable?: boolean
   outcome?: 'accepted' | 'rejected'
   /** Akzeptiert auch ohne Endzustand (Kellerautomat mit leerem Stack, Transduktor) */
   acceptAny?: boolean
@@ -25,6 +27,7 @@ export function StateNodeView({
   state,
   selected,
   active,
+  reachable = false,
   outcome,
   acceptAny = false,
   text = state.label,
@@ -39,6 +42,7 @@ export function StateNodeView({
         'state',
         selected && 'is-selected',
         active && 'is-active',
+        reachable && !active && 'is-reachable',
         // Akzeptiert: nur die aktiven Endzustände grün – beim NEA sieht man so den Zweig,
         // der akzeptiert. Verworfen: alle aktiven Zustände rot.
         active && outcome === 'rejected' && 'is-rejected',

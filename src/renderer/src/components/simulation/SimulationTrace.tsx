@@ -1,4 +1,13 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 import {
   formatLabel,
   formatStack,
@@ -91,8 +100,7 @@ export function SimulationTrace({ sim }: { sim: SimulationControls }) {
     Math.ceil((view.top + view.height - metrics.offset) / metrics.row) + OVERSCAN
   )
 
-  const labelOf = (id: string): string => states.find((s) => s.id === id)?.label ?? '?'
-  const formatStates = (ids: string[]): string => formatStateSet(ids.map(labelOf), single)
+  const labels = useMemo(() => new Map(states.map((s) => [s.id, s.label])), [states])
   // Stabil über alle Renderings, damit unveränderte Zeilen (memo) nicht neu gezeichnet werden
   const goToRef = useRef(sim.goTo)
   goToRef.current = sim.goTo
@@ -134,7 +142,8 @@ export function SimulationTrace({ sim }: { sim: SimulationControls }) {
                 position={i}
                 isCurrent={isCurrent}
                 outcome={isLast ? finalOutcome : undefined}
-                states={formatStates(step.activeStateIds)}
+                labels={labels}
+                single={single}
                 hasRule={hasRule}
                 hasStack={hasStack}
                 hasOutput={hasOutput}
@@ -174,8 +183,10 @@ interface TraceRowProps {
   position: number
   isCurrent: boolean
   outcome?: 'accepted' | 'rejected'
-  /** Zustand(smenge) als Text */
-  states: string
+  /** Zustandsnamen nach ID */
+  labels: ReadonlyMap<string, string>
+  /** Ein Zustand pro Schritt (DEA, KA, TM, Transduktor): ohne Mengenklammern */
+  single: boolean
   hasRule: boolean
   hasStack: boolean
   hasOutput: boolean
@@ -193,7 +204,8 @@ const TraceRow = memo(function TraceRow({
   position,
   isCurrent,
   outcome,
-  states,
+  labels,
+  single,
   hasRule,
   hasStack,
   hasOutput,
@@ -210,7 +222,9 @@ const TraceRow = memo(function TraceRow({
       <td className="is-mono">
         {hasRule ? (step.label ? formatLabel(step.label, gamma) : '–') : (step.symbol ?? '–')}
       </td>
-      <td className="is-mono">{states}</td>
+      <td className="is-mono">
+        <StateSet step={step} labels={labels} single={single} />
+      </td>
       <td className="is-mono">
         {step.tape ? formatTapeAround(step.tape, step.head ?? 0) : step.remaining || 'ε'}
       </td>
@@ -219,3 +233,40 @@ const TraceRow = memo(function TraceRow({
     </tr>
   )
 })
+
+/**
+ * Zustandsmenge der Konfiguration. Beim NEA die ganze Menge δ*(q0, gelesen) – die Zustände auf
+ * dem hervorgehobenen Pfad fett, die übrigen gedämpft, sofern nicht alle darauf liegen.
+ */
+function StateSet({
+  step,
+  labels,
+  single
+}: {
+  step: SimulationStep
+  labels: ReadonlyMap<string, string>
+  single: boolean
+}) {
+  const label = (id: string): string => labels.get(id) ?? '?'
+  const ids = step.activeStateIds
+  const path = step.pathStateIds
+  if (!path || ids.every((id) => path.includes(id))) {
+    return <>{formatStateSet(ids.map(label), single)}</>
+  }
+  return (
+    <>
+      {'{'}
+      {ids.map((id, i) => (
+        <Fragment key={id}>
+          {i > 0 && ', '}
+          {path.includes(id) ? (
+            <strong>{label(id)}</strong>
+          ) : (
+            <span className="muted">{label(id)}</span>
+          )}
+        </Fragment>
+      ))}
+      {'}'}
+    </>
+  )
+}

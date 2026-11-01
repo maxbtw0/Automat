@@ -68,10 +68,11 @@ interface Layer {
  * (der Automat „hängt“). Akzeptiert wird, wenn das ganze Wort gelesen wurde und ein aktiver
  * Zustand ein Endzustand ist.
  *
- * Angezeigt werden nur die Zweige, die wirklich etwas beitragen: Der ganze Lauf wird vorab
+ * `activeStateIds` ist immer die ganze Menge δ*(q0, gelesen). Hervorgehoben werden nur die
+ * Zweige, die wirklich etwas beitragen (`pathStateIds`, Übergänge): Der ganze Lauf wird vorab
  * berechnet und dann rückwärts ausgedünnt. Akzeptiert → nur Zustände/Übergänge auf einem
  * akzeptierenden Pfad. Verworfen → nur die Zweige, die am weitesten kommen. Zweige, die
- * unterwegs aussterben, werden nicht hervorgehoben.
+ * unterwegs aussterben, sind nur aktiv, nicht hervorgehoben.
  */
 export class StateSetSimulator implements Simulator {
   private readonly tokens: string[]
@@ -191,7 +192,8 @@ export class StateSetSimulator implements Simulator {
     const { alphabet } = this.document
     return {
       index: position,
-      activeStateIds: stateIds,
+      activeStateIds: [...this.layers[position].states],
+      pathStateIds: stateIds,
       usedTransitionIds: transitionIds,
       get consumed() {
         return joinWord(tokens.slice(0, position), alphabet)
