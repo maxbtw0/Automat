@@ -205,14 +205,20 @@ export class PushdownSimulator implements Simulator {
     return { accepted: this.accepted ?? false, steps }
   }
 
+  /** Gelesener Teil und Rest entstehen erst beim Lesen – jeder Schritt bleibt klein. */
   private snapshot(): SimulationStep {
     const c = this.search.path[this.position]
+    const { tokens } = this
     return {
       index: this.position,
       activeStateIds: c.state === null ? [] : [c.state],
       usedTransitionIds: c.edge ? [c.edge.id] : [],
-      consumed: this.tokens.slice(0, c.position).join(''),
-      remaining: this.tokens.slice(c.position).join(''),
+      get consumed() {
+        return tokens.slice(0, c.position).join('')
+      },
+      get remaining() {
+        return tokens.slice(c.position).join('')
+      },
       symbol: c.label ? c.label.read : null,
       inputPosition: c.position,
       stack: c.stack,

@@ -184,16 +184,22 @@ export class StateSetSimulator implements Simulator {
     }))
   }
 
+  /** Gelesener Teil und Rest entstehen erst beim Lesen – jeder Schritt bleibt klein. */
   private snapshot(): SimulationStep {
     const { stateIds, transitionIds } = this.shown[this.position]
+    const { tokens, position } = this
     return {
-      index: this.position,
+      index: position,
       activeStateIds: stateIds,
       usedTransitionIds: transitionIds,
-      consumed: this.tokens.slice(0, this.position).join(''),
-      remaining: this.tokens.slice(this.position).join(''),
-      symbol: this.position > 0 ? this.tokens[this.position - 1] : null,
-      inputPosition: this.position
+      get consumed() {
+        return tokens.slice(0, position).join('')
+      },
+      get remaining() {
+        return tokens.slice(position).join('')
+      },
+      symbol: position > 0 ? tokens[position - 1] : null,
+      inputPosition: position
     }
   }
 }

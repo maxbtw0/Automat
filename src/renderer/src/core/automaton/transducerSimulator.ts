@@ -48,35 +48,50 @@ export class TransducerSimulator implements Simulator {
     const { graph } = document
     const tokens = tokenizeWord(word, document.alphabet)
     const moore = outputsOnStates(document.type)
+    /** Ausgabe des ganzen Laufs, ein Stück pro Schritt – alle Schritte teilen sich die Liste */
+    const pieces: string[][] = []
+    /**
+     * Gelesener Teil, Rest und bisherige Ausgabe entstehen erst beim Lesen – sonst trüge jeder
+     * Schritt eine Kopie davon und lange Wörter kosteten quadratisch viel Speicher.
+     */
     const snapshot = (
       read: number,
       state: StateId | null,
-      output: string[][],
       edge?: TransitionEdge,
       label?: TransitionLabel
-    ): SimulationStep => ({
-      index: read,
-      activeStateIds: state === null ? [] : [state],
-      usedTransitionIds: edge ? [edge.id] : [],
-      consumed: tokens.slice(0, read).join(''),
-      remaining: tokens.slice(read).join(''),
-      symbol: read > 0 ? tokens[read - 1] : null,
-      inputPosition: read,
-      output,
-      // Moore: die Regel liest nur – was ausgegeben wird, steht am Zustand
-      ...(label && !moore ? { label } : {})
-    })
+    ): SimulationStep => {
+      let output: string[][] | undefined
+      return {
+        index: read,
+        activeStateIds: state === null ? [] : [state],
+        usedTransitionIds: edge ? [edge.id] : [],
+        get consumed() {
+          return tokens.slice(0, read).join('')
+        },
+        get remaining() {
+          return tokens.slice(read).join('')
+        },
+        symbol: read > 0 ? tokens[read - 1] : null,
+        inputPosition: read,
+        get output() {
+          return (output ??= pieces.slice(0, read + 1))
+        },
+        // Moore: die Regel liest nur – was ausgegeben wird, steht am Zustand
+        ...(label && !moore ? { label } : {})
+      }
+    }
 
     const start = startState(graph)
     if (!start) {
-      this.steps.push(snapshot(0, null, [[]]))
+      pieces.push([])
+      this.steps.push(snapshot(0, null))
       this.abortReason = 'Kein Startzustand'
       this.complete = false
       return
     }
     let state = start
-    let output = [moore ? stateOutput(start) : []]
-    this.steps.push(snapshot(0, state.id, output))
+    pieces.push(moore ? stateOutput(start) : [])
+    this.steps.push(snapshot(0, state.id))
     for (const [i, symbol] of tokens.entries()) {
       const rule = findRule(graph, state.id, symbol)
       const next = rule && findState(graph, rule.edge.to)
@@ -85,8 +100,8 @@ export class TransducerSimulator implements Simulator {
         break
       }
       state = next
-      output = [...output, moore ? stateOutput(next) : (rule.label.output ?? [])]
-      this.steps.push(snapshot(i + 1, state.id, output, rule.edge, rule.label))
+      pieces.push(moore ? stateOutput(next) : (rule.label.output ?? []))
+      this.steps.push(snapshot(i + 1, state.id, rule.edge, rule.label))
     }
     this.complete = this.abortReason === null
   }
