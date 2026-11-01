@@ -43,6 +43,19 @@ describe('serialization', () => {
     ])
   })
 
+  it('legt parallele Übergänge desselben Zustandspaars zusammen', () => {
+    const doc = createEmptyDocument()
+    doc.alphabet = ['a', 'b']
+    doc.graph.states.push({ id: 's1', label: 'q0', x: 0, y: 0, isStart: true, isFinal: true })
+    doc.graph.transitions.push(
+      { id: 't1', from: 's1', to: 's1', labels: [{ read: 'a' }] },
+      { id: 't2', from: 's1', to: 's1', labels: [{ read: 'b' }, { read: 'a' }] }
+    )
+    expect(deserializeDocument(serializeDocument(doc)).graph.transitions).toEqual([
+      { id: 't1', from: 's1', to: 's1', labels: [{ read: 'a' }, { read: 'b' }] }
+    ])
+  })
+
   it('lehnt fremde Dateien ab', () => {
     expect(() => deserializeDocument('{"foo": 1}')).toThrow()
     expect(() => deserializeDocument('kein json')).toThrow()

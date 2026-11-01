@@ -34,7 +34,7 @@ export interface SimulationSnapshot {
   steps: SimulationStep[]
   /** Hervorgehobener Schritt (bei „Graph mit Tabelle“) */
   index: number
-  /** Ergebnis, falls der letzte Schritt das Ende der Simulation ist */
+  /** Ergebnis, falls der letzte Schritt das Ende der Simulation ist – fehlt bei Abbruch am Limit */
   outcome?: 'accepted' | 'rejected'
   /** Grund, falls die Simulation vorzeitig abgebrochen ist (Limit) */
   abortReason?: string | null
@@ -240,7 +240,9 @@ function simulationResult(
   document: AutomatonDocument,
   snapshot: SimulationSnapshot
 ): TableResult | undefined {
-  if (snapshot.abortReason) return { text: snapshot.abortReason, tone: 'rejected' }
+  if (snapshot.abortReason) {
+    return { text: snapshot.abortReason, tone: snapshot.outcome ? 'rejected' : 'aborted' }
+  }
   if (!snapshot.outcome) return undefined
   if (usesOutput(document.type) && snapshot.outcome === 'accepted') {
     const last = snapshot.steps[snapshot.steps.length - 1]

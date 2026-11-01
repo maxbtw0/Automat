@@ -194,9 +194,18 @@ export const BLANK = '#'
 const BLANK_SPELLINGS = new Set(['□', '_'])
 
 /** Bandalphabet Γ = Σ ∪ {Blank} – Blank aus den Vorgaben (Standard #) */
+/** Ersatz-Blanks, falls das voreingestellte Blank schon in Σ liegt */
+const SPARE_BLANKS = ['#', '$', '§', '%', '&', '~']
+
+/** Bandangaben zu Σ: Γ = Σ ∪ {Blank}, das Blank nie aus Σ (sonst wäre die Maschine ungültig). */
 export function createTapeSettings(alphabet: string[] = []): TapeSettings {
-  const { blank } = defaults
-  return { alphabet: [...alphabet.filter((s) => s !== blank), blank], blank }
+  const taken = new Set(alphabet)
+  const blank = [defaults.blank, ...SPARE_BLANKS].find((s) => !taken.has(s)) ?? freeSymbol(taken)
+  return { alphabet: [...alphabet, blank], blank }
+}
+
+function freeSymbol(taken: Set<string>): string {
+  for (let i = 0; ; i++) if (!taken.has(`#${i}`)) return `#${i}`
 }
 
 /** Bandangaben des Dokuments – bei Dokumenten ohne Band die Voreinstellung. */

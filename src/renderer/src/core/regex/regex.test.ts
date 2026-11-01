@@ -111,6 +111,11 @@ describe('Symbole mit Operator-Zeichen', () => {
     expect(() => parseRegex('a\\')).toThrow('„\\“ ohne Zeichen danach')
   })
 
+  it('liest Zeichen außerhalb der Basisebene als ein Symbol (Emoji)', () => {
+    expect(parseRegex('😀*')).toEqual(star(symbol('😀')))
+    expect(parseRegex('a😀')).toEqual(concat(symbol('a'), symbol('😀')))
+  })
+
   it('ungeschützte Klammern bleiben Klammern, auch wenn „(“ in Σ liegt', () => {
     expect(parseRegex('(a)', ['(', ')', 'a'])).toEqual(symbol('a'))
   })

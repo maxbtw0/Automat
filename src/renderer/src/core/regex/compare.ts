@@ -1,3 +1,4 @@
+import { formatWord } from '@/core/automaton/labels'
 import type { AutomatonDocument } from '@/model/graph'
 import {
   findDifference,
@@ -11,7 +12,9 @@ export type RegexComparison =
   | { kind: 'equal' }
   | {
       kind: 'different'
-      /** Kürzestes unterscheidendes Wort ('' = leeres Wort) */
+      /** Kürzestes unterscheidendes Wort als Symbolfolge ([] = leeres Wort) */
+      symbols: string[]
+      /** Dasselbe als Text mit eindeutigen Symbolgrenzen („a b“ bei Σ = {a, b, ab}), '' = ε */
       word: string
       acceptedBy: 'automaton' | 'regex'
     }
@@ -33,7 +36,8 @@ export function compareRegexWithAutomaton(
   if (!difference) return { kind: 'equal' }
   return {
     kind: 'different',
-    word: difference.word.join(''),
+    symbols: difference.word,
+    word: difference.word.length > 0 ? formatWord(difference.word, alphabet) : '',
     acceptedBy: difference.acceptedBy === 'first' ? 'automaton' : 'regex'
   }
 }

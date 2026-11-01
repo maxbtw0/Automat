@@ -189,12 +189,18 @@ function simulationForExport(document: AutomatonDocument): SimulationSnapshot {
   if (errors.length > 0) throw new Error(errors.map((issue) => issue.message).join(' · '))
   const simulator = automaton.createSimulator(word)
   // Darf die Turingmaschine unbegrenzt laufen, rechnet der Export trotzdem nur bis zur Grenze.
-  const unlimited = simulationLimits().tmStepLimit === 0
+  // Die anderen Typen enden immer von selbst.
+  const unlimited = document.type === 'TM' && simulationLimits().tmStepLimit === 0
   const steps = [
     simulator.reset(),
     ...simulator.run(unlimited ? EXPORT_STEP_LIMIT : Infinity).steps
   ]
-  const outcome = simulator.isFinished && simulator.accepted ? 'accepted' : 'rejected'
+  const outcome =
+    !simulator.isFinished || simulator.undecided
+      ? undefined
+      : simulator.accepted
+        ? 'accepted'
+        : 'rejected'
   const abortReason = simulator.isFinished
     ? (simulator.abortReason ?? null)
     : `Abbruch nach ${EXPORT_STEP_LIMIT.toLocaleString('de-DE')} Schritten`

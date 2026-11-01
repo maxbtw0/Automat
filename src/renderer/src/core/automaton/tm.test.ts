@@ -177,6 +177,7 @@ describe('Turingmaschine – Simulation', () => {
     const sim = createAutomaton(doc).createSimulator('aa')
     expect(sim.run().accepted).toBe(false)
     expect(sim.abortReason).toBeNull()
+    expect(sim.undecided).toBe(false)
   })
 
   it('bricht eine Endlosschleife nach dem Schrittlimit ab', () => {
@@ -188,6 +189,7 @@ describe('Turingmaschine – Simulation', () => {
     expect(accepted).toBe(false)
     expect(steps).toHaveLength(STEP_LIMIT)
     expect(sim.abortReason).toBe('Abbruch nach 10.000 Schritten')
+    expect(sim.undecided).toBe(true)
   })
 
   it('läuft auch links von Zelle 0 und zeigt Band und Kopf in jedem Schritt', () => {
@@ -240,6 +242,15 @@ describe('Turingmaschine – Typwechsel', () => {
       { read: 'a', write: 'a', move: 'R' },
       { read: 'b', write: 'b', move: 'R' }
     ])
+  })
+
+  it('DEA → TM wählt ein freies Blank, wenn „#“ schon in Σ liegt', () => {
+    const dfa = buildDocument('DFA', ['a', '#'], { start: 'q0', finals: ['q0'] }, [
+      ['q0', 'a,#', 'q0']
+    ])
+    const tm = changeDocumentType(dfa, 'TM')
+    expect(tm.tape).toEqual({ alphabet: ['a', '#', '$'], blank: '$' })
+    expect(errors(tm)).toEqual([])
   })
 
   it('KA → TM lässt ε-Regeln weg, TM → NEA behält nur Symbole aus Σ', () => {

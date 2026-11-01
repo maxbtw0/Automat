@@ -5,7 +5,14 @@ import type { SimulationStep, Simulator } from '@/core/automaton/types'
 import { useEditorStore, type HighlightPulse } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
 
-export type SimulationStatus = 'idle' | 'paused' | 'playing' | 'accepted' | 'rejected'
+export type SimulationStatus =
+  | 'idle'
+  | 'paused'
+  | 'playing'
+  | 'accepted'
+  | 'rejected'
+  /** an einem Limit abgebrochen, ohne Ergebnis */
+  | 'aborted'
 
 /**
  * „Bis zum Ende“ rechnet in Häppchen zu so vielen Schritten und lässt dazwischen die Oberfläche
@@ -64,7 +71,9 @@ export function useSimulation(): SimulationControls {
   const status: SimulationStatus = finished
     ? simulator.accepted
       ? 'accepted'
-      : 'rejected'
+      : simulator.undecided
+        ? 'aborted'
+        : 'rejected'
     : playing || running
       ? 'playing'
       : steps.length > 0

@@ -130,8 +130,22 @@ describe('compareRegexWithAutomaton', () => {
   it('verschieden – mit Symbol, das nicht im Alphabet ist', () => {
     expect(compareRegexWithAutomaton(doc, parseRegex('(b|ab*a)*|c'))).toEqual({
       kind: 'different',
+      symbols: ['c'],
       word: 'c',
       acceptedBy: 'regex'
+    })
+  })
+
+  it('zeigt Symbolgrenzen, wenn die Verkettung ein anderes Symbol ergäbe', () => {
+    const ab = buildDocument('DFA', ['a', 'b', 'ab'], { start: 'q0', finals: ['q2'] }, [
+      ['q0', 'a', 'q1'],
+      ['q1', 'b', 'q2']
+    ])
+    expect(compareRegexWithAutomaton(ab, parseRegex('∅'))).toEqual({
+      kind: 'different',
+      symbols: ['a', 'b'],
+      word: 'a b',
+      acceptedBy: 'automaton'
     })
   })
 })

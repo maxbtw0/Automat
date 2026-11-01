@@ -102,6 +102,7 @@ describe('Kellerautomat – Simulation', () => {
     const sim = createAutomaton(anbn()).createSimulator('aab')
     const { accepted, steps } = sim.run()
     expect(accepted).toBe(false)
+    expect(sim.undecided).toBe(false)
     expect(steps.at(-1)?.inputPosition).toBe(3)
     expect(formatStack(steps.at(-1)?.stack ?? [])).toBe('A#')
   })
@@ -113,6 +114,7 @@ describe('Kellerautomat – Simulation', () => {
     const sim = createAutomaton(doc).createSimulator('a')
     expect(sim.run().accepted).toBe(false)
     expect(sim.abortReason).toBe(`Abbruch bei Stackhöhe ${STACK_LIMIT}`)
+    expect(sim.undecided).toBe(true)
   })
 
   it('verwechselt keine Konfigurationen, wenn IDs oder Stacksymbole „|“ enthalten', () => {

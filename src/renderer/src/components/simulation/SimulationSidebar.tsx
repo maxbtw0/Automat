@@ -12,7 +12,8 @@ const STATUS_LABEL: Record<SimulationStatus, string> = {
   paused: 'Pausiert',
   playing: 'Läuft',
   accepted: 'Akzeptiert',
-  rejected: 'Verworfen'
+  rejected: 'Verworfen',
+  aborted: 'Abgebrochen'
 }
 
 /** Transduktor: Ergebnis ist die Ausgabe – fertig übersetzt oder unterwegs abgebrochen */

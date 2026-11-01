@@ -245,6 +245,10 @@ export class TuringSimulator implements Simulator {
     return this.isHalted && this.state !== null && this.finals.has(this.state)
   }
 
+  get undecided(): boolean {
+    return this.isFinished && !this.isHalted && this.foreign === null
+  }
+
   get abortReason(): string | null {
     // Ein Wort außerhalb von Σ* gehört nicht zur Sprache – die Maschine rechnet gar nicht erst
     if (this.foreign !== null) return `„${this.foreign}“ nicht in Σ`

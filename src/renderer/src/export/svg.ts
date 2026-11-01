@@ -236,7 +236,7 @@ export type RowTone = 'current' | 'accepted' | 'rejected'
 /** Ergebnis unter der Tabelle, z. B. „Verworfen“ oder der Grund eines Abbruchs */
 export interface TableResult {
   text: string
-  tone: 'accepted' | 'rejected'
+  tone: 'accepted' | 'rejected' | 'aborted'
 }
 
 export interface ExportTable {
@@ -335,7 +335,8 @@ export function tableSvg(table: ExportTable, palette: Palette = LIGHT): SvgImage
   })
   parts.push(rule(tableBottom))
   if (table.result) {
-    const color = table.result.tone === 'accepted' ? P.success : P.danger
+    const { tone } = table.result
+    const color = tone === 'accepted' ? P.success : tone === 'rejected' ? P.danger : P.muted
     parts.push(
       `<text x="${MARGIN}" y="${tableBottom + RESULT_HEIGHT / 2 + 4}" dominant-baseline="central" ` +
         `font-family="${escapeXml(FONT)}" font-size="${RESULT_SIZE}" font-weight="600" ` +

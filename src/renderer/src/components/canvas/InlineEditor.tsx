@@ -49,9 +49,14 @@ export function InlineEditor({
       onPointerDown={(e) => e.stopPropagation()}
       onBlur={() => finish(true)}
       onKeyDown={(e) => {
-        e.stopPropagation()
-        if (e.key === 'Enter') finish(true)
-        else if (e.key === 'Escape') finish(false)
+        // Nur die eigenen Tasten anhalten – Kürzel wie Strg+S sollen weiter durchkommen
+        if (e.key === 'Enter') {
+          e.stopPropagation()
+          finish(true)
+        } else if (e.key === 'Escape') {
+          e.stopPropagation()
+          finish(false)
+        }
       }}
     />
   )

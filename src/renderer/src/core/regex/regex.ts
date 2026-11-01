@@ -288,8 +288,10 @@ export function parseRegex(input: string, alphabet: string[] = []): Regex {
       return symbol(text)
     }
     if (SPECIAL.has(c)) fail(`Unerwartetes Zeichen „${c}“`)
-    pos += 1
-    return symbol(c)
+    // Ganzes Zeichen, nicht nur eine UTF-16-Hälfte – sonst bindet „😀*“ den Stern falsch
+    const text = String.fromCodePoint(input.codePointAt(pos) as number)
+    pos += text.length
+    return symbol(text)
   }
 
   if (peek() === undefined) fail('Ausdruck erwartet')

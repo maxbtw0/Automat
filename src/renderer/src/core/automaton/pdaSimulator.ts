@@ -184,6 +184,11 @@ export class PushdownSimulator implements Simulator {
     return this.isFinished && !this.search.accepted ? this.search.abortReason : null
   }
 
+  /** Die Suche hat ein Limit erreicht, ohne einen akzeptierenden Lauf zu finden */
+  get undecided(): boolean {
+    return this.abortReason !== null
+  }
+
   reset(): SimulationStep {
     this.position = 0
     return this.snapshot()

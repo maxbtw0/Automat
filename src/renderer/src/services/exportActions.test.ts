@@ -63,6 +63,38 @@ describe('Simulation exportieren', () => {
     }
   })
 
+  it('rechnet nur die Turingmaschine bis zur Exportgrenze – andere Typen bis zum Ende', () => {
+    const loop = buildDocument('DFA', ['a'], { start: 'q0', finals: ['q0'] }, [['q0', 'a', 'q0']])
+    useEditorStore.getState().loadDocument(loop, null)
+    useScreenStore.setState({ simulationWord: 'a'.repeat(10_001) })
+    setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: 0 })
+    try {
+      const { table } = planExport('simulationTable', 'csv', 'light')
+      expect(table?.rows).toHaveLength(10_002)
+      expect(table?.result).toEqual({ text: 'Akzeptiert', tone: 'accepted' })
+    } finally {
+      setSimulationLimits(DEFAULT_SIMULATION)
+    }
+  })
+
+  it('ein Abbruch am Limit ist weder akzeptiert noch verworfen', () => {
+    const tm = buildDocument('TM', ['a'], { start: 'q0', finals: ['q2'] }, [
+      ['q0', '# → #, N', 'q1'],
+      ['q1', '# → #, N', 'q2']
+    ])
+    useEditorStore.getState().loadDocument(tm, null)
+    useScreenStore.setState({ simulationWord: '' })
+    setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: 1 })
+    try {
+      const { table } = planExport('simulationTable', 'csv', 'light')
+      expect(table?.rowTones?.at(-1)).toBeUndefined()
+      expect(table?.result).toEqual({ text: 'Abbruch nach 1 Schritten', tone: 'aborted' })
+    } finally {
+      setSimulationLimits(DEFAULT_SIMULATION)
+    }
+    expect(planExport('simulationTable', 'csv', 'light').table?.result?.tone).toBe('accepted')
+  })
+
   it('meldet, warum es nicht geht', () => {
     useEditorStore.getState().updateState('q0', { isStart: false })
     expect(() => planExport('simulationTable', 'csv', 'light')).toThrow('Kein Startzustand')

@@ -185,5 +185,34 @@ export function deserializeDocument(text: string): AutomatonDocument {
   checkOutput(doc.output)
   checkStates(doc.graph.states)
   checkTransitions(transitions)
+  document.graph = { ...doc.graph, transitions: mergeParallel(transitions as TransitionEdge[]) }
   return document as unknown as AutomatonDocument
+}
+
+/**
+ * Das Modell hat einen Übergang pro Zustandspaar (Tabelle und Panel verlassen sich darauf).
+ * Von Hand geschriebene Dateien können mehrere haben – die werden zum ersten zusammengelegt,
+ * gleiche Regeln nur einmal.
+ */
+function mergeParallel(transitions: TransitionEdge[]): TransitionEdge[] {
+  const byPair = new Map<string, TransitionEdge>()
+  const seen = new Map<string, Set<string>>()
+  for (const t of transitions) {
+    const pair = JSON.stringify([t.from, t.to])
+    const first = byPair.get(pair)
+    if (!first) {
+      byPair.set(pair, t)
+      seen.set(pair, new Set(t.labels.map((l) => JSON.stringify(l))))
+      continue
+    }
+    const keys = seen.get(pair) as Set<string>
+    const added = t.labels.filter((l) => {
+      const key = JSON.stringify(l)
+      if (keys.has(key)) return false
+      keys.add(key)
+      return true
+    })
+    byPair.set(pair, { ...first, labels: [...first.labels, ...added] })
+  }
+  return [...byPair.values()]
 }

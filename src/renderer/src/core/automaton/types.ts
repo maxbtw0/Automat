@@ -79,6 +79,8 @@ export interface Simulator {
   readonly accepted: boolean | null
   /** Grund, warum die Suche vorzeitig aufgehört hat (Limit erreicht) – sonst `null` */
   readonly abortReason?: string | null
+  /** Lauf an einem Limit abgebrochen – über das Wort ist damit nichts entschieden */
+  readonly undecided?: boolean
   /** Setzt auf die Startkonfiguration zurück und liefert sie. */
   reset(): SimulationStep
   /** Führt genau einen Schritt aus und liefert die neue Konfiguration. */
