@@ -117,18 +117,30 @@ export function findDifference(
   const keyOf = (a: Set<StateId>, b: Set<StateId>): string =>
     JSON.stringify([[...a].sort(), [...b].sort()])
 
-  const startPair = {
+  // Pro Paar nur Vorgänger und letztes Symbol – das Wort entsteht erst beim Gegenbeispiel
+  type Entry = { a: Set<StateId>; b: Set<StateId>; parent: number; symbol: string | null }
+  const startPair: Entry = {
     a: closureOf(first, first.start ? [first.start] : []),
     b: closureOf(second, second.start ? [second.start] : []),
-    word: [] as string[]
+    parent: -1,
+    symbol: null
   }
   const seen = new Set([keyOf(startPair.a, startPair.b)])
   const queue = [startPair]
+  const wordTo = (index: number): string[] => {
+    const word: string[] = []
+    for (let i = index; queue[i].symbol !== null; i = queue[i].parent) {
+      word.push(queue[i].symbol as string)
+    }
+    return word.reverse()
+  }
 
   for (let i = 0; i < queue.length; i++) {
-    const { a, b, word } = queue[i]
+    const { a, b } = queue[i]
     const inA = accepts(first, a)
-    if (inA !== accepts(second, b)) return { word, acceptedBy: inA ? 'first' : 'second' }
+    if (inA !== accepts(second, b)) {
+      return { word: wordTo(i), acceptedBy: inA ? 'first' : 'second' }
+    }
     for (const symbol of alphabet) {
       const nextA = closureOf(first, move(first.graph, a, symbol).states)
       const nextB = closureOf(second, move(second.graph, b, symbol).states)
@@ -136,7 +148,7 @@ export function findDifference(
       if (seen.has(key)) continue
       if (seen.size >= MAX_PAIRS) throw new Error('Automaten zu groß für den Vergleich')
       seen.add(key)
-      queue.push({ a: nextA, b: nextB, word: [...word, symbol] })
+      queue.push({ a: nextA, b: nextB, parent: i, symbol })
     }
   }
   return null

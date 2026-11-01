@@ -6,6 +6,7 @@ import { automatonToRegex } from '@/core/regex/fromAutomaton'
 import {
   EMPTY_SET,
   UNION_SYMBOL,
+  compactRegexParts,
   formatRegex,
   formatRegexParts,
   parseRegex,
@@ -162,14 +163,19 @@ export function RegularExpressionScreen() {
   )
 }
 
+/** So viele Zeichen zeigt die Ansicht höchstens – der ganze Ausdruck geht über „Kopieren“ */
+const PREVIEW_LIMIT = 4000
+
 /** Regulärer Ausdruck mit hochgestelltem Kleene-Stern */
 function RegexText({ regex, className }: { regex: Regex; className?: string }) {
   const alphabet = useEditorStore((s) => s.document.alphabet)
+  const parts = useMemo(
+    () => compactRegexParts(formatRegexParts(regex, alphabet), PREVIEW_LIMIT).parts,
+    [regex, alphabet]
+  )
   return (
     <code className={className}>
-      {formatRegexParts(regex, alphabet).map((part, i) =>
-        part.sup ? <sup key={i}>{part.text}</sup> : <span key={i}>{part.text}</span>
-      )}
+      {parts.map((part, i) => (part.sup ? <sup key={i}>{part.text}</sup> : part.text))}
     </code>
   )
 }

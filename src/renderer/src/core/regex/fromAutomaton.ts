@@ -27,12 +27,16 @@ export function automatonToRegex(document: AutomatonDocument): Regex {
 
   /** edges.get(p).get(r) = Ausdruck auf der Kante p → r */
   const edges = new Map<StateId, Map<StateId, Regex>>()
+  /** into.get(r) = alle p mit einer Kante p → r (Index, damit niemand alle Kanten durchsucht) */
+  const into = new Map<StateId, Set<StateId>>()
   const get = (p: StateId, r: StateId): Regex => edges.get(p)?.get(r) ?? empty
   const add = (p: StateId, r: StateId, regex: Regex): void => {
     const combined = union(get(p, r), regex)
     if (combined.kind === 'empty') return
     if (!edges.has(p)) edges.set(p, new Map())
     edges.get(p)?.set(r, combined)
+    if (!into.has(r)) into.set(r, new Set())
+    into.get(r)?.add(p)
   }
 
   add(NEW_START, start.id, epsilon)
@@ -41,10 +45,12 @@ export function automatonToRegex(document: AutomatonDocument): Regex {
     for (const a of edgeSymbols(t)) add(t.from, t.to, a === EPSILON ? epsilon : symbol(a))
   }
 
-  const incoming = (q: StateId): StateId[] =>
-    [...edges.keys()].filter((p) => p !== q && edges.get(p)?.has(q))
+  const incoming = (q: StateId): StateId[] => [...(into.get(q) ?? [])].filter((p) => p !== q)
   const outgoing = (q: StateId): StateId[] =>
     [...(edges.get(q)?.keys() ?? [])].filter((r) => r !== q)
+  /** Anzahl ohne Schleife, ohne Listen zu bauen */
+  const degree = (set: { size: number; has(q: StateId): boolean } | undefined, q: StateId) =>
+    set ? set.size - (set.has(q) ? 1 : 0) : 0
 
   const remaining = graph.states.map((s) => s.id)
   while (remaining.length > 0) {
@@ -52,7 +58,7 @@ export function automatonToRegex(document: AutomatonDocument): Regex {
     let best = 0
     let bestCost = Infinity
     remaining.forEach((q, i) => {
-      const cost = incoming(q).length * outgoing(q).length
+      const cost = degree(into.get(q), q) * degree(edges.get(q), q)
       if (cost < bestCost) {
         best = i
         bestCost = cost
@@ -67,7 +73,9 @@ export function automatonToRegex(document: AutomatonDocument): Regex {
       for (const r of outs) add(p, r, concat(get(p, q), loop, get(q, r)))
     }
     for (const p of ins) edges.get(p)?.delete(q)
+    for (const r of outs) into.get(r)?.delete(q)
     edges.delete(q)
+    into.delete(q)
   }
 
   return get(NEW_START, NEW_FINAL)

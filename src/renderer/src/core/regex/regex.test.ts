@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compactRegexParts,
   concat,
   epsilon,
   formatRegex,
@@ -64,6 +65,20 @@ describe('formatRegexParts', () => {
       { text: '*', sup: true },
       { text: 'a' }
     ])
+  })
+})
+
+describe('compactRegexParts', () => {
+  it('fasst normalen Text zusammen und kürzt lange Ausdrücke', () => {
+    const parts = formatRegexParts(parseRegex('(a+b)*a'))
+    expect(compactRegexParts(parts)).toEqual({
+      parts: [{ text: '(a+b)' }, { text: '*', sup: true }, { text: 'a' }],
+      truncated: false
+    })
+    expect(compactRegexParts(parts, 4)).toEqual({
+      parts: [{ text: '(a+b' }, { text: '…' }],
+      truncated: true
+    })
   })
 })
 

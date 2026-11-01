@@ -170,6 +170,29 @@ export function formatRegex(regex: Regex, alphabet: string[] = []): string {
     .join('')
 }
 
+/**
+ * Teile für die Anzeige: aufeinanderfolgender normaler Text als ein Stück, höchstens `limit`
+ * Zeichen – ein längerer Ausdruck endet mit „…“ (`truncated`).
+ */
+export function compactRegexParts(
+  parts: RegexPart[],
+  limit = Infinity
+): { parts: RegexPart[]; truncated: boolean } {
+  const result: RegexPart[] = []
+  let length = 0
+  for (const part of parts) {
+    if (length + part.text.length > limit) {
+      result.push({ text: '…' })
+      return { parts: result, truncated: true }
+    }
+    length += part.text.length
+    const last = result.at(-1)
+    if (last && !last.sup && !part.sup) last.text += part.text
+    else result.push({ ...part })
+  }
+  return { parts: result, truncated: false }
+}
+
 /** Alle Symbole, die im Ausdruck vorkommen */
 export function regexSymbols(regex: Regex): Set<string> {
   switch (regex.kind) {
