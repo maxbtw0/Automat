@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocument } from '@/core/automaton/testing'
-import { elementsInRect, loopAngle, selfLoop } from './geometry'
+import { boxCorners, elementsInPolygon, loopAngle, selfLoop } from './geometry'
 
 const graphWith = (positions: Record<string, [number, number]>, edges: [string, string][]) => {
   const doc = buildDocument(
@@ -41,15 +41,33 @@ describe('selfLoop', () => {
   })
 })
 
-describe('elementsInRect', () => {
+describe('elementsInPolygon', () => {
   it('nimmt Zustände mit Mittelpunkt im Rechteck und die Übergänge zwischen ihnen', () => {
     const g = graphWith(
       { p: [0, 0], q: [100, 0], r: [300, 0] },
       [['p', 'q'], ['q', 'r'], ['q', 'q']]
     )
-    const found = elementsInRect(g, { x: 150, y: 50 }, { x: -50, y: -50 })
+    const found = elementsInPolygon(g, boxCorners({ x: 150, y: 50 }, { x: -50, y: -50 }))
     expect(found.stateIds).toEqual(['p', 'q'])
     const kept = g.transitions.filter((t) => found.transitionIds.includes(t.id))
     expect(kept.map((t) => `${t.from}${t.to}`)).toEqual(['pq', 'qq'])
+  })
+
+  it('Lasso in U-Form: der Zustand in der Bucht bleibt draußen', () => {
+    const g = graphWith({ p: [0, 0], q: [100, 0], r: [200, 0] }, [['p', 'r']])
+    // Bucht von oben bis unter q, links um p und rechts um r herum
+    const u = [
+      { x: -50, y: -50 },
+      { x: 50, y: -50 },
+      { x: 50, y: 30 },
+      { x: 150, y: 30 },
+      { x: 150, y: -50 },
+      { x: 250, y: -50 },
+      { x: 250, y: 50 },
+      { x: -50, y: 50 }
+    ]
+    const found = elementsInPolygon(g, u)
+    expect(found.stateIds).toEqual(['p', 'r'])
+    expect(found.transitionIds).toHaveLength(1)
   })
 })

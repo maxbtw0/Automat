@@ -542,13 +542,18 @@ function TooltipsPage() {
         <Parts
           rows={[
             ['Mausrad', 'zoomen'],
-            ['Ziehen auf freier Fläche', 'Ansicht verschieben (auch mittlere Maustaste)'],
-            [<kbd key="s">Leertaste</kbd>, 'gedrückt halten und ziehen: Ansicht verschieben'],
+            ['Ziehen auf freier Fläche', 'Rechteck aufziehen: mehrere Elemente auswählen'],
+            [
+              <span key="s">
+                <kbd>Strg</kbd> oder <kbd>Leertaste</kbd>
+              </span>,
+              'gedrückt halten und ziehen: Ansicht verschieben (auch mittlere Maustaste)'
+            ],
             ['Doppelklick auf freie Fläche', 'neuer Zustand'],
             ['Doppelklick auf Zustand', 'umbenennen'],
             ['Doppelklick auf Übergang', 'Beschriftung bearbeiten'],
-            ['Lasso: Rechteck aufziehen', 'mehrere Zustände samt Übergängen auswählen'],
-            [<kbd key="u">Umschalt</kbd>, '+ Klick oder Lasso: zur Auswahl hinzufügen'],
+            ['Lasso: frei umfahren', 'mehrere Zustände samt Übergängen auswählen'],
+            [<kbd key="u">Umschalt</kbd>, '+ Klick, Rechteck oder Lasso: zur Auswahl hinzufügen'],
             ['Ausgewählte Gruppe ziehen', 'alle zusammen verschieben'],
             ['Rechtsklick', 'Kontextmenü (Startzustand, Endzustand, Löschen …)']
           ]}

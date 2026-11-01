@@ -1316,11 +1316,12 @@ h4 {
   pointer-events: none;
 }
 
-.lasso-rect {
+.selection-area {
   fill: var(--accent-soft);
   stroke: var(--accent);
   stroke-width: 1;
   stroke-dasharray: 4 3;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 

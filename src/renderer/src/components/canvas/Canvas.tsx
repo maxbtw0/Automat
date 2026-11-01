@@ -22,7 +22,8 @@ import {
 import { classNames, isEditableTarget } from '@/utils/dom'
 import {
   clamp,
-  elementsInRect,
+  boxCorners,
+  elementsInPolygon,
   findStateAt,
   previewEdgePath,
   screenToWorld,
@@ -40,6 +41,8 @@ import { TransitionView } from './TransitionView'
 const GRID_SIZE = 20
 /** Ab dieser Mausbewegung (px) gilt ein Klick als Ziehen */
 const DRAG_THRESHOLD = 3
+/** Abstand (px) zwischen zwei Punkten des Lassos */
+const LASSO_STEP = 4
 
 type ContextMenuState =
   | { x: number; y: number; kind: 'state'; id: StateId }
@@ -64,12 +67,13 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const inlineEdit = useEditorStore((s) => s.inlineEdit)
 
   const [spacePressed, setSpacePressed] = useState(false)
+  const [ctrlPressed, setCtrlPressed] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
   const [connectPreview, setConnectPreview] = useState<{ fromId: StateId; pointer: Point } | null>(
     null
   )
-  /** Lasso-Rechteck in Canvas-Koordinaten (Pixel) */
-  const [lasso, setLasso] = useState<{ a: Point; b: Point } | null>(null)
+  /** Auswahlrechteck bzw. Lasso als Vieleck in Canvas-Koordinaten (Pixel) */
+  const [area, setArea] = useState<Point[] | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
 
@@ -193,25 +197,34 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     }
   }, [])
 
-  // ---------- Leertaste = Ansicht verschieben ----------
+  // ---------- Leertaste / Strg = Ansicht verschieben ----------
 
   useEffect(() => {
     // Im Nur-Lesen-Modus verschiebt schon das normale Ziehen – die Leertaste bleibt frei.
     if (readOnly) return
     const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Control') setCtrlPressed(true)
       if (e.code === 'Space' && !isEditableTarget(e.target)) {
         e.preventDefault()
         setSpacePressed(true)
       }
     }
     const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === 'Control') setCtrlPressed(false)
       if (e.code === 'Space') setSpacePressed(false)
+    }
+    // Fensterwechsel mit gedrückter Taste: das keyup kommt nie an
+    const onBlur = (): void => {
+      setCtrlPressed(false)
+      setSpacePressed(false)
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
     }
   }, [readOnly])
 
@@ -305,23 +318,37 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     )
   }
 
-  /** Rechteck aufziehen; mit Umschalt kommt der Inhalt zur bisherigen Auswahl dazu. */
-  const startLasso = (e: PointerEvent, additive: boolean): void => {
+  /**
+   * Rechteck (Auswahl-Werkzeug) oder freie Form (Lasso) aufziehen; mit Umschalt kommt der
+   * Inhalt zur bisherigen Auswahl dazu.
+   */
+  const startAreaSelect = (e: PointerEvent, shape: 'box' | 'free'): void => {
     const store = useEditorStore.getState()
+    const additive = e.shiftKey
     const base = additive ? selectedIds(store.selection) : { stateIds: [], transitionIds: [] }
     if (!additive) store.select(null)
-    const a = containerPoint(e.clientX, e.clientY)
-    setLasso({ a, b: a })
+    const start = containerPoint(e.clientX, e.clientY)
+    let points = [start]
+    setArea(points)
     trackPointer(
       e,
-      (ev) => setLasso({ a, b: containerPoint(ev.clientX, ev.clientY) }),
       (ev) => {
-        setLasso(null)
+        const p = containerPoint(ev.clientX, ev.clientY)
+        if (shape === 'box') {
+          points = boxCorners(start, p)
+        } else {
+          const last = points[points.length - 1]
+          if (Math.hypot(p.x - last.x, p.y - last.y) < LASSO_STEP) return
+          points = [...points, p]
+        }
+        setArea(points)
+      },
+      () => {
+        setArea(null)
         const { document, viewport: vp, select } = useEditorStore.getState()
-        const found = elementsInRect(
+        const found = elementsInPolygon(
           document.graph,
-          screenToWorld(vp, a),
-          clientToWorld(ev.clientX, ev.clientY)
+          points.map((p) => screenToWorld(vp, p))
         )
         const union = (x: string[], y: string[]): string[] => [...new Set([...x, ...y])]
         select(
@@ -331,7 +358,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           )
         )
       },
-      () => setLasso(null)
+      () => setArea(null)
     )
   }
 
@@ -361,7 +388,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
 
   const handleBackgroundPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
     setContextMenu(null)
-    if (e.button === 1 || (e.button === 0 && spacePressed)) {
+    if (e.button === 1 || (e.button === 0 && (spacePressed || e.ctrlKey))) {
       e.preventDefault()
       startPan(e)
       return
@@ -384,11 +411,10 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         break
       }
       case 'select':
-        store.select(null)
-        startPan(e)
+        startAreaSelect(e, 'box')
         break
       case 'lasso':
-        startLasso(e, e.shiftKey)
+        startAreaSelect(e, 'free')
         break
       default:
         store.select(null)
@@ -413,8 +439,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   // ---------- Zustände ----------
 
   const handleStatePointerDown = (e: PointerEvent<SVGGElement>, state: StateNode): void => {
-    // Mittelklick/Leertaste an den Hintergrund durchreichen → Ansicht verschieben
-    if (readOnly || e.button !== 0 || spacePressed) return
+    // Mittelklick/Leertaste/Strg an den Hintergrund durchreichen → Ansicht verschieben
+    if (readOnly || e.button !== 0 || spacePressed || e.ctrlKey) return
     e.stopPropagation()
     setContextMenu(null)
 
@@ -465,7 +491,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   // ---------- Übergänge ----------
 
   const handleTransitionPointerDown = (e: PointerEvent<SVGGElement>, t: TransitionEdge): void => {
-    if (readOnly || e.button !== 0 || spacePressed) return
+    if (readOnly || e.button !== 0 || spacePressed || e.ctrlKey) return
     e.stopPropagation()
     setContextMenu(null)
     const store = useEditorStore.getState()
@@ -617,7 +643,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         className={classNames(
           'canvas',
           readOnly ? 'is-read-only' : `tool-${tool}`,
-          spacePressed && 'is-space-pan',
+          (spacePressed || ctrlPressed) && 'is-space-pan',
           isPanning && 'is-panning'
         )}
         onPointerDown={handleBackgroundPointerDown}
@@ -703,13 +729,10 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           ))}
         </g>
 
-        {lasso && (
-          <rect
-            className="lasso-rect"
-            x={Math.min(lasso.a.x, lasso.b.x)}
-            y={Math.min(lasso.a.y, lasso.b.y)}
-            width={Math.abs(lasso.a.x - lasso.b.x)}
-            height={Math.abs(lasso.a.y - lasso.b.y)}
+        {area && (
+          <path
+            className="selection-area"
+            d={`M ${area.map((p) => `${p.x} ${p.y}`).join(' L ')} Z`}
           />
         )}
       </svg>

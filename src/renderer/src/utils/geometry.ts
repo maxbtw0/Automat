@@ -180,21 +180,34 @@ export function findStateAt(states: StateNode[], p: Point, r = STATE_RADIUS): St
   return undefined
 }
 
+/** Die vier Ecken des Rechtecks zwischen `a` und `b` (als Vieleck für `elementsInPolygon`). */
+export function boxCorners(a: Point, b: Point): Point[] {
+  return [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }]
+}
+
+/** Strahlverfahren: Liegt `p` im (auch nicht konvexen) Vieleck? Die letzte Kante schließt es. */
+export function pointInPolygon(p: Point, polygon: Point[]): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i]
+    const b = polygon[j]
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside
+    }
+  }
+  return inside
+}
+
 /**
- * Lasso: Zustände, deren Mittelpunkt im Rechteck zwischen `a` und `b` liegt, und die Übergänge
+ * Auswahlrechteck und Lasso: Zustände, deren Mittelpunkt im Vieleck liegt, und die Übergänge
  * zwischen ihnen.
  */
-export function elementsInRect(
+export function elementsInPolygon(
   graph: EditorGraph,
-  a: Point,
-  b: Point
+  polygon: Point[]
 ): { stateIds: string[]; transitionIds: string[] } {
-  const [left, right] = [Math.min(a.x, b.x), Math.max(a.x, b.x)]
-  const [top, bottom] = [Math.min(a.y, b.y), Math.max(a.y, b.y)]
   const inside = new Set(
-    graph.states
-      .filter((s) => s.x >= left && s.x <= right && s.y >= top && s.y <= bottom)
-      .map((s) => s.id)
+    graph.states.filter((s) => pointInPolygon(s, polygon)).map((s) => s.id)
   )
   return {
     stateIds: [...inside],
