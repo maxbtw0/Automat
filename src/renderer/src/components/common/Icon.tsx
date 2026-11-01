@@ -6,7 +6,7 @@ const PATHS = {
   undo: 'M9 14L4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11',
   redo: 'M15 14l5-5-5-5 M20 9H9.5a5.5 5.5 0 0 0 0 11H13',
   select: 'M5 3l14 7-6 2-2 6z',
-  lasso: 'M4.2 13A9 6 0 0 1 3 10.2 M3.5 7.9A9 6 0 0 1 6 5.5 M8.9 4.4A9 6 0 0 1 13.3 4.1 M16.5 4.8A9 6 0 0 1 19.6 6.8 M20.9 9A9 6 0 0 1 20.6 11.9 M18.9 13.9A9 6 0 0 1 15.4 15.6 M12.5 16a1.5 1.5 0 1 0-3 0a1.5 1.5 0 1 0 3 0 M10 17.3c-.5 2-2 3-4 3.7',
+  lasso: 'M14 13l7 3.2-3 1.1-1.2 3z',
   state: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z',
   transition: 'M5 19L19 5 M9 5h10v10',
   delete: 'M3 6h18 M8 6V4h8v2 M6 6l1 14h10l1-14',
@@ -33,6 +33,11 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS
 
+/** Zusätzliche gestrichelte Linien, z. B. die Spur des Lassos */
+const DASHED: Partial<Record<IconName, string>> = {
+  lasso: 'M12.5 13.2C8 14.6 3.4 13.4 3.2 9.6 3 6 6.5 3.5 11 3.5s8 1.8 7.8 5.2'
+}
+
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   return (
     <svg
@@ -47,6 +52,7 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <path d={PATHS[name]} />
+      {DASHED[name] && <path d={DASHED[name]} strokeDasharray="2 4.5" />}
     </svg>
   )
 }
