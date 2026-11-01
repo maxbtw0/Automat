@@ -46,6 +46,8 @@ export interface OpenFileResult {
 /** Die API, die der Preload als `window.api` bereitstellt. */
 export interface AutomatApi {
   openFile(): Promise<OpenFileResult | null>
+  /** Pfad einer ins Fenster gezogenen Datei, `''` wenn sie keinen hat. */
+  pathForFile(file: File): string
   /** Speichert `content`. Ohne `filePath` wird ein Speichern-Dialog gezeigt. Liefert den Pfad oder `null` bei Abbruch. */
   saveFile(content: string, filePath: string | null): Promise<string | null>
   /** Export: speichert `data` über einen Speichern-Dialog. Liefert den Pfad oder `null`. */

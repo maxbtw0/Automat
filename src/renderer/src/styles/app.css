@@ -297,6 +297,15 @@ h4 {
   flex: 1;               /* nimmt den ganzen Rest unter der Toolbar */
   min-height: 0;         /* darf schrumpfen, sonst läuft der Canvas über */
 }
+/* Datei schwebt über dem Fenster: Rahmen um alles, Klicks gehen durch */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
 
 /* ---------- Tabellen-Screens (Alphabet, Übergangstabelle) ---------- */
 .table-screen {

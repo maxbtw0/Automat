@@ -11,6 +11,7 @@ import {
   confirmDiscard,
   displayName,
   newFile,
+  openDroppedFile,
   openFile,
   runMenuAction,
   saveFile
@@ -257,6 +258,63 @@ describe('Öffnen während weiterer Änderungen', () => {
     await pending
     expect(store().document.type).toBe('NFA')
     expect(store().filePath).toBe('/nea.json')
+  })
+})
+
+describe('Datei ins Fenster ziehen', () => {
+  const store = () => useEditorStore.getState()
+  const dialog = () => useDialogStore.getState()
+  const pathForFile = vi.fn<AutomatApi['pathForFile']>()
+  const dropped = (name: string, content: string) =>
+    ({ name, text: () => Promise.resolve(content) }) as File
+  const nfa = () => serializeDocument(createEmptyDocument('NFA'))
+
+  beforeEach(() => {
+    pathForFile.mockReset().mockReturnValue('C:\Automaten\nea.json')
+    vi.stubGlobal('window', { api: { pathForFile } })
+    store().newDocument()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('öffnet die Datei mit ihrem vollen Pfad', async () => {
+    await openDroppedFile(dropped('nea.json', nfa()))
+    expect(store().document.type).toBe('NFA')
+    expect(store().filePath).toBe('C:\Automaten\nea.json')
+    expect(store().dirty).toBe(false)
+  })
+
+  it('fragt vorher nach ungespeicherten Änderungen', async () => {
+    store().addState(0, 0)
+    const pending = openDroppedFile(dropped('nea.json', nfa()))
+    expect(dialog().request?.buttons).toEqual(['Speichern', 'Nicht speichern', 'Abbrechen'])
+    dialog().answer(2)
+    await pending
+    expect(store().document.graph.states).toHaveLength(1)
+    expect(store().filePath).toBeNull()
+  })
+
+  it('„Nicht speichern“ öffnet die Datei', async () => {
+    store().addState(0, 0)
+    const pending = openDroppedFile(dropped('nea.json', nfa()))
+    dialog().answer(1)
+    await pending
+    expect(store().document.type).toBe('NFA')
+  })
+
+  it('ohne Pfad gilt der Automat als neu', async () => {
+    pathForFile.mockReturnValue('')
+    await openDroppedFile(dropped('nea.json', nfa()))
+    expect(store().document.type).toBe('NFA')
+    expect(store().filePath).toBeNull()
+  })
+
+  it('meldet eine ungültige Datei und behält den Automaten', async () => {
+    store().addState(0, 0)
+    store().markSaved(null)
+    await openDroppedFile(dropped('bild.png', 'kein json'))
+    expect(store().document.graph.states).toHaveLength(1)
+    expect(store().status?.kind).toBe('error')
   })
 })
 

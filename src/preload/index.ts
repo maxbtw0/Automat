@@ -1,8 +1,9 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import { IpcChannels, type AutomatApi, type MenuAction } from '../shared/ipc'
 
 const api: AutomatApi = {
   openFile: () => ipcRenderer.invoke(IpcChannels.openFile),
+  pathForFile: (file) => webUtils.getPathForFile(file),
   saveFile: (content, filePath) => ipcRenderer.invoke(IpcChannels.saveFile, content, filePath),
   saveExport: (defaultName, filter, data) =>
     ipcRenderer.invoke(IpcChannels.exportSave, defaultName, filter, data),

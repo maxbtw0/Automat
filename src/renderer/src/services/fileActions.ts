@@ -71,13 +71,26 @@ export async function newFile(): Promise<void> {
   useEditorStore.getState().loadDocument(createConfiguredDocument(), null)
 }
 
-export async function openFile(): Promise<void> {
+export function openFile(): Promise<void> {
+  return openFrom(() => (window.api ? window.api.openFile() : openFileInBrowser()))
+}
+
+/** Öffnet eine ins Fenster gezogene Datei – mit derselben Rückfrage wie „Öffnen“. */
+export function openDroppedFile(file: File): Promise<void> {
+  return openFrom(async () => ({
+    // Im Browser gibt es keinen Pfad – der Dateiname reicht für den Anzeigenamen
+    filePath: window.api ? window.api.pathForFile(file) : file.name,
+    content: await file.text()
+  }))
+}
+
+async function openFrom(read: () => Promise<OpenFileResult | null>): Promise<void> {
   if (!(await confirmDiscard())) return
   const store = useEditorStore.getState()
   // Das Lesen ist asynchron – wer währenddessen weiterarbeitet, soll nichts verlieren
   const { session, document: before } = store
   try {
-    const result = window.api ? await window.api.openFile() : await openFileInBrowser()
+    const result = await read()
     if (!result) return
     const document = deserializeDocument(result.content)
     const now = useEditorStore.getState()
@@ -85,7 +98,8 @@ export async function openFile(): Promise<void> {
     if (now.document !== before && !(await confirmDiscard())) return
     if (useEditorStore.getState().session !== session) return
     // Im Browser ist das nur der Dateiname (ohne Ordner) – reicht für den Anzeigenamen.
-    store.loadDocument(document, result.filePath)
+    // Ohne Pfad (Electron kennt ihn nicht) fragt „Speichern“ wie bei einem neuen Automaten.
+    store.loadDocument(document, result.filePath || null)
     store.setStatus(null)
   } catch (err) {
     store.setStatus({ kind: 'error', text: `Öffnen fehlgeschlagen: ${describeError(err)}` })

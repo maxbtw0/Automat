@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useCloseGuard } from '@/hooks/useCloseGuard'
+import { useFileDrop } from '@/hooks/useFileDrop'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import { displayName, runMenuAction } from '@/services/fileActions'
 import { initSettings } from '@/services/settingsActions'
@@ -15,6 +16,7 @@ import { Toolbar } from '@/components/toolbar/Toolbar'
 export function App() {
   useShortcuts()
   useCloseGuard()
+  const dropping = useFileDrop()
 
   useEffect(() => window.api?.onMenuAction(runMenuAction), [])
   useEffect(() => initSettings(), [])
@@ -41,6 +43,7 @@ return (
     <ExportDialog />
     <SettingsDialog />
     <HelpDialog />
+    {dropping && <div className="drop-overlay" />}
     {/* Zuletzt: Rückfragen liegen über allen anderen Fenstern */}
     <DialogHost />
   </div>
