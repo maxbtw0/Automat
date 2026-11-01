@@ -120,8 +120,8 @@ export function findDifference(
   // Pro Paar nur Vorgänger und letztes Symbol – das Wort entsteht erst beim Gegenbeispiel
   type Entry = { a: Set<StateId>; b: Set<StateId>; parent: number; symbol: string | null }
   const startPair: Entry = {
-    a: closureOf(first, first.start ? [first.start] : []),
-    b: closureOf(second, second.start ? [second.start] : []),
+    a: closureOf(first, first.start === null ? [] : [first.start]),
+    b: closureOf(second, second.start === null ? [] : [second.start]),
     parent: -1,
     symbol: null
   }

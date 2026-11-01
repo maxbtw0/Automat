@@ -25,7 +25,7 @@ export function compareRegexWithAutomaton(
   regex: Regex
 ): RegexComparison {
   const automaton = machineFromDocument(document)
-  if (!automaton.start) throw new Error('Kein Startzustand')
+  if (automaton.start === null) throw new Error('Kein Startzustand')
   const symbols = [
     ...document.alphabet,
     ...transitionSymbols(document.graph),

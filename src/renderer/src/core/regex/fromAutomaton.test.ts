@@ -148,6 +148,18 @@ describe('compareRegexWithAutomaton', () => {
       acceptedBy: 'automaton'
     })
   })
+
+  it('Startzustand mit leerer ID zählt als Startzustand', () => {
+    const doc: AutomatonDocument = {
+      type: 'NFA',
+      alphabet: ['a'],
+      graph: {
+        states: [{ id: '', label: 'q0', x: 0, y: 0, isStart: true, isFinal: true }],
+        transitions: []
+      }
+    }
+    expect(compareRegexWithAutomaton(doc, parseRegex('ε'))).toEqual({ kind: 'equal' })
+  })
 })
 
 describe('Schlüssel und Hilfszustände', () => {
