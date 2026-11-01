@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CommitInput } from '@/components/common/CommitInput'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import { TURING_TABLE_TOOLS, type TuringTableTool } from '@/editor/turingTableTools'
 import { nextStatePosition, tapeSettings, type StateId } from '@/model/graph'
-import { turingCell, type TuringCell } from '@/model/turingTable'
+import { turingCell, turingCells, type TuringCell } from '@/model/turingTable'
 import { askChoice } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
@@ -33,7 +33,9 @@ export function TuringTable() {
   const [editing, setEditing] = useState<{ from: StateId; read: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const labelOf = (id: StateId): string => graph.states.find((s) => s.id === id)?.label ?? '?'
+  const labels = useMemo(() => new Map(graph.states.map((s) => [s.id, s.label])), [graph.states])
+  const labelOf = (id: StateId): string => labels.get(id) ?? '?'
+  const cells = useMemo(() => turingCells(graph), [graph])
 
   const handleAdd = (): void => {
     const { x, y } = nextStatePosition(graph)
@@ -152,7 +154,7 @@ export function TuringTable() {
                   />
                 </td>
                 {symbols.map((symbol) => {
-                  const cell = turingCell(graph, state.id, symbol)
+                  const cell = cells.get(state.id)?.get(symbol) ?? null
                   return (
                     <td key={symbol} className="turing-cell-td">
                       <button

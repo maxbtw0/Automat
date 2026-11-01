@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocument } from '@/core/automaton/testing'
-import { setTuringCell, turingCell } from './turingTable'
+import { setTuringCell, turingCell, turingCells } from './turingTable'
 
 const tm = () =>
   buildDocument('TM', ['a', 'b'], { start: 'q0', states: ['q2'] }, [
@@ -16,6 +16,16 @@ describe('Turing-Tabelle', () => {
     const { graph } = tm()
     expect(turingCell(graph, 'q0', '#')).toEqual({ to: 'q1', write: '#', move: 'L' })
     expect(turingCell(graph, 'q1', 'a')).toBeNull()
+  })
+
+  it('liest alle Zellen auf einmal wie einzeln', () => {
+    const { graph } = tm()
+    const cells = turingCells(graph)
+    for (const from of ['q0', 'q1', 'q2']) {
+      for (const read of ['a', 'b', '#']) {
+        expect(cells.get(from)?.get(read) ?? null).toEqual(turingCell(graph, from, read))
+      }
+    }
   })
 
   it('ändert eine Zelle an Ort und Stelle, wenn der Folgezustand bleibt', () => {

@@ -30,6 +30,23 @@ export function turingCell(graph: EditorGraph, from: StateId, read: string): Tur
   return null
 }
 
+/**
+ * Alle belegten Zellen auf einmal: `cells.get(from)?.get(read)`. Für die ganze Matrix – ein
+ * Durchlauf über die Kanten statt einer Suche pro Zelle. Wie `turingCell` gewinnt die erste Regel.
+ */
+export function turingCells(graph: EditorGraph): Map<StateId, Map<string, TuringCell>> {
+  const cells = new Map<StateId, Map<string, TuringCell>>()
+  for (const t of graph.transitions) {
+    let row = cells.get(t.from)
+    if (!row) cells.set(t.from, (row = new Map()))
+    for (const l of t.labels) {
+      if (row.has(l.read)) continue
+      row.set(l.read, { to: t.to, write: l.write ?? l.read, move: l.move ?? 'N' })
+    }
+  }
+  return cells
+}
+
 export function sameTuringCell(a: TuringCell | null, b: TuringCell | null): boolean {
   if (a === null || b === null) return a === b
   return a.to === b.to && a.write === b.write && a.move === b.move

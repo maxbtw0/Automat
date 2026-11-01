@@ -1,4 +1,4 @@
-import type { EditorGraph, StateNode, TransitionEdge } from '@/model/graph'
+import type { EditorGraph, StateId, StateNode, TransitionEdge } from '@/model/graph'
 
 export const STATE_RADIUS = 28
 
@@ -131,15 +131,46 @@ const angleBetween = (a: number, b: number): number => {
   return d > Math.PI ? 2 * Math.PI - d : d
 }
 
+/** Nachschlagetabellen für die Kantengeometrie – einmal pro Graph statt einmal pro Kante */
+export interface GraphIndex {
+  states: Map<StateId, StateNode>
+  /** `JSON.stringify([from, to])` jeder Kante */
+  pairs: Set<string>
+  /** Nachbarn jedes Zustands über Kanten ohne Schleifen (mehrfach bei Hin- und Rückkante) */
+  neighbours: Map<StateId, StateNode[]>
+}
+
+const pairKey = (from: StateId, to: StateId): string => JSON.stringify([from, to])
+
+export function indexGraph(graph: EditorGraph): GraphIndex {
+  const states = new Map(graph.states.map((s) => [s.id, s]))
+  const pairs = new Set<string>()
+  const neighbours = new Map<StateId, StateNode[]>()
+  const link = (id: StateId, other: StateNode | undefined): void => {
+    if (!other) return
+    const list = neighbours.get(id)
+    if (list) list.push(other)
+    else neighbours.set(id, [other])
+  }
+  for (const t of graph.transitions) {
+    pairs.add(pairKey(t.from, t.to))
+    if (t.from === t.to) continue
+    link(t.from, states.get(t.to))
+    link(t.to, states.get(t.from))
+  }
+  return { states, pairs, neighbours }
+}
+
 /**
  * Richtung der Schleife so wählen, dass sie nicht auf einer anderen Kante des Zustands liegt:
  * die erste freie aus LOOP_ANGLES (meist oben), sonst die mit dem meisten Platz.
  */
-export function loopAngle(state: StateNode, graph: EditorGraph): number {
-  const neighbours = graph.transitions
-    .filter((t) => t.from !== t.to && (t.from === state.id || t.to === state.id))
-    .map((t) => graph.states.find((s) => s.id === (t.from === state.id ? t.to : t.from)))
-    .filter((s): s is StateNode => s !== undefined)
+export function loopAngle(
+  state: StateNode,
+  graph: EditorGraph,
+  index: GraphIndex = indexGraph(graph)
+): number {
+  const neighbours = (index.neighbours.get(state.id) ?? [])
     // Richtung zum Nachbarn im selben Maß wie `angle`: 0 = oben, im Uhrzeigersinn
     .map((s) => Math.atan2(s.x - state.x, -(s.y - state.y)))
   if (neighbours.length === 0) return 0
@@ -152,17 +183,33 @@ export function loopAngle(state: StateNode, graph: EditorGraph): number {
 
 export function transitionGeometry(
   transition: TransitionEdge,
-  graph: EditorGraph
+  graph: EditorGraph,
+  index: GraphIndex = indexGraph(graph)
 ): EdgeGeometry | null {
-  const from = graph.states.find((s) => s.id === transition.from)
-  const to = graph.states.find((s) => s.id === transition.to)
+  const from = index.states.get(transition.from)
+  const to = index.states.get(transition.to)
   if (!from || !to) return null
-  if (from.id === to.id) return selfLoop(from, STATE_RADIUS, loopAngle(from, graph))
+  if (from.id === to.id) return selfLoop(from, STATE_RADIUS, loopAngle(from, graph, index))
 
-  const hasReverse = graph.transitions.some(
-    (t) => t.from === transition.to && t.to === transition.from
-  )
+  const hasReverse = index.pairs.has(pairKey(transition.to, transition.from))
   return hasReverse ? curvedEdge(from, to) : straightEdge(from, to)
+}
+
+/** Graphen sind unveränderlich – der Export zeichnet denselben Graphen in jedem Schritt */
+const geometryCache = new WeakMap<EditorGraph, Map<string, EdgeGeometry>>()
+
+/** Geometrie aller Übergänge nach ID – linear in Zuständen und Kanten, pro Graph einmal. */
+export function edgeGeometries(graph: EditorGraph): Map<string, EdgeGeometry> {
+  const cached = geometryCache.get(graph)
+  if (cached) return cached
+  const index = indexGraph(graph)
+  const map = new Map<string, EdgeGeometry>()
+  for (const t of graph.transitions) {
+    const g = transitionGeometry(t, graph, index)
+    if (g) map.set(t.id, g)
+  }
+  geometryCache.set(graph, map)
+  return map
 }
 
 /** Vorschau-Linie beim Ziehen eines neuen Übergangs. */

@@ -236,8 +236,9 @@ function TransitionList() {
     setSelectedKey(entryKey({ ...entry, [field]: id }))
   }
 
-  const labelOf = (id: string): string => graph.states.find((s) => s.id === id)?.label ?? '?'
-  const stateLabels = graph.states.map((s) => s.label)
+  const labels = useMemo(() => new Map(graph.states.map((s) => [s.id, s.label])), [graph.states])
+  const labelOf = (id: string): string => labels.get(id) ?? '?'
+  const stateLabels = useMemo(() => [...labels.values()], [labels])
 
   const stateInput = (entry: TransitionEntry, field: 'from' | 'to', label: string) => (
     <ComboInput

@@ -8,16 +8,19 @@ export type ValidationState =
   | { kind: 'ok'; issues: ValidationIssue[] }
   | { kind: 'notImplemented' | 'error'; message: string }
 
-/** Prüft das aktuelle Dokument – neu bei jeder Änderung. */
+/**
+ * Prüft das aktuelle Dokument – neu bei jeder inhaltlichen Änderung (`revision`). Verschieben
+ * ändert nur Koordinaten, keine Prüfung hängt davon ab.
+ */
 export function useValidation(): ValidationState {
-  const doc = useEditorStore((s) => s.document)
+  const revision = useEditorStore((s) => s.revision)
   return useMemo<ValidationState>(() => {
     try {
-      return { kind: 'ok', issues: createAutomaton(doc).validate() }
+      return { kind: 'ok', issues: createAutomaton(useEditorStore.getState().document).validate() }
     } catch (err) {
       return { kind: isNotImplemented(err) ? 'notImplemented' : 'error', message: describeError(err) }
     }
-  }, [doc])
+  }, [revision])
 }
 
 /** Wählt den ersten betroffenen Zustand bzw. Übergang aus. Gibt zurück, ob es einen gab. */

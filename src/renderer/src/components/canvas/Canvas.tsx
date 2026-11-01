@@ -26,13 +26,12 @@ import { classNames, isEditableTarget } from '@/utils/dom'
 import {
   clamp,
   boxCorners,
+  edgeGeometries,
   elementsInPolygon,
   findStateAt,
   previewEdgePath,
   screenToWorld,
-  transitionGeometry,
   worldToScreen,
-  type EdgeGeometry,
   type Point
 } from '@/utils/geometry'
 import { isPanKey, panModifierHeld } from '@shared/navigationSettings'
@@ -91,14 +90,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
 
   const { states, transitions } = doc.graph
 
-  const geometries = useMemo(() => {
-    const map = new Map<string, EdgeGeometry>()
-    for (const t of doc.graph.transitions) {
-      const g = transitionGeometry(t, doc.graph)
-      if (g) map.set(t.id, g)
-    }
-    return map
-  }, [doc.graph])
+  const geometries = useMemo(() => edgeGeometries(doc.graph), [doc.graph])
 
   const activeStates = useMemo(() => new Set(highlight?.activeStateIds), [highlight])
   const activeTransitions = useMemo(() => new Set(highlight?.usedTransitionIds), [highlight])

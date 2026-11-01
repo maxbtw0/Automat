@@ -24,7 +24,7 @@ import {
   type AlphabetKind,
   type AutomatonDocument
 } from '@/model/graph'
-import { turingCell } from '@/model/turingTable'
+import { turingCells } from '@/model/turingTable'
 import { formatStateSet } from '@/utils/format'
 import type { ExportTable, RowTone, TableResult } from './svg'
 
@@ -145,7 +145,9 @@ function turingTable(document: AutomatonDocument, sorted: boolean): ExportTable 
   const { graph } = document
   const tape = tapeSettings(document)
   const symbols = [...tape.alphabet.filter((s) => s !== tape.blank), tape.blank]
-  const label = (id: string): string => findState(graph, id)?.label ?? '?'
+  const labels = new Map(graph.states.map((s) => [s.id, s.label]))
+  const label = (id: string): string => labels.get(id) ?? '?'
+  const cells = turingCells(graph)
   const states = sorted
     ? [...graph.states].sort((a, b) => compareSymbols(a.label, b.label))
     : graph.states
@@ -158,7 +160,7 @@ function turingTable(document: AutomatonDocument, sorted: boolean): ExportTable 
     rows: states.map((state) => [
       `${state.isStart ? '→' : ''}${state.isFinal ? '*' : ''} ${state.label}`.trim(),
       ...symbols.map((symbol) => {
-        const cell = turingCell(graph, state.id, symbol)
+        const cell = cells.get(state.id)?.get(symbol) ?? null
         return cell ? `${label(cell.to)}, ${cell.write}, ${cell.move}` : '–'
       })
     ])

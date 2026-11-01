@@ -2062,13 +2062,19 @@ h4 {
   min-height: 0;
   padding: 12px 20px;
   overflow: auto;
+  /* Die Zeilen werden beim Scrollen ausgetauscht – der Browser soll nicht nachkorrigieren */
+  overflow-anchor: none;
 }
 .sim-trace-table {
   max-width: none;
 }
-/* Regeln wie „ε, # → #“ nicht umbrechen */
+/* Regeln wie „ε, # → #“ nicht umbrechen – so sind alle Zeilen gleich hoch */
 .sim-trace-table td.is-mono {
   white-space: nowrap;
+}
+.sim-trace-table .sim-trace-spacer td {
+  padding: 0;
+  border: 0;
 }
 .data-table .is-mono {
   font-family: var(--mono);

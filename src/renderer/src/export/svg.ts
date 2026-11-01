@@ -5,9 +5,9 @@ import type { Highlight } from '@/store/editorStore'
 import {
   LABEL_LINE_HEIGHT,
   STATE_RADIUS,
+  edgeGeometries,
   labelCenter,
-  labelLineYs,
-  transitionGeometry
+  labelLineYs
 } from '@/utils/geometry'
 
 /** Ein fertiges Bild als SVG-Text mit seiner Größe in Pixeln und seiner Hintergrundfarbe */
@@ -146,8 +146,9 @@ export function graphSvg(
   }
 
   const edges: string[] = []
+  const geometries = edgeGeometries(document.graph)
   for (const t of transitions) {
-    const geometry = transitionGeometry(t, document.graph)
+    const geometry = geometries.get(t.id)
     if (!geometry) continue
     const active = activeTransitions.has(t.id)
     const color = active ? P.accent : P.edge

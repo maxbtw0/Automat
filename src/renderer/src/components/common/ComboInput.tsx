@@ -46,12 +46,16 @@ export function ComboInput({
 
   useEffect(() => setDraft(value), [value])
 
-  const query = draft.trim().toLowerCase()
-  const shown = filtering ? options.filter((o) => o.toLowerCase().includes(query)) : options
-  const items: Item[] = [
-    ...shown.map((label): Item => ({ kind: 'option', label })),
-    ...actions.map((action): Item => ({ kind: 'action', label: action.label, action }))
-  ]
+  /** Einträge der Liste – nur für das gerade offene Feld, eine Tabelle hat sehr viele davon */
+  const buildItems = (): Item[] => {
+    const query = draft.trim().toLowerCase()
+    const shown = filtering ? options.filter((o) => o.toLowerCase().includes(query)) : options
+    return [
+      ...shown.map((label): Item => ({ kind: 'option', label })),
+      ...actions.map((action): Item => ({ kind: 'action', label: action.label, action }))
+    ]
+  }
+  const items = open ? buildItems() : []
 
   useEffect(() => {
     if (activeIndex < 0) return
@@ -110,10 +114,11 @@ export function ComboInput({
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
-            if (items.length === 0) return
+            const count = (open ? items : buildItems()).length
+            if (count === 0) return
             setOpen(true)
             const step = e.key === 'ArrowDown' ? 1 : -1
-            setActiveIndex((i) => (i + step + items.length) % items.length)
+            setActiveIndex((i) => (i + step + count) % count)
           } else if (e.key === 'Enter') {
             const item = open ? items[activeIndex] : undefined
             if (item) choose(item)

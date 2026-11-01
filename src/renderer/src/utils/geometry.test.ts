@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { buildDocument } from '@/core/automaton/testing'
-import { boxCorners, elementsInPolygon, loopAngle, selfLoop } from './geometry'
+import {
+  boxCorners,
+  edgeGeometries,
+  elementsInPolygon,
+  loopAngle,
+  selfLoop,
+  transitionGeometry
+} from './geometry'
 
 const graphWith = (positions: Record<string, [number, number]>, edges: [string, string][]) => {
   const doc = buildDocument(
@@ -28,6 +35,18 @@ describe('loopAngle', () => {
     )
     const trap = g.states.find((s) => s.id === 'trap')!
     expect(deg(loopAngle(trap, g))).toBe(180)
+  })
+})
+
+describe('edgeGeometries', () => {
+  it('liefert dasselbe wie die Einzelberechnung – gebogen bei Gegenkante', () => {
+    const g = graphWith(
+      { p: [0, 0], q: [200, 0], r: [100, 150] },
+      [['p', 'q'], ['q', 'p'], ['q', 'r'], ['r', 'r']]
+    )
+    const all = edgeGeometries(g)
+    for (const t of g.transitions) expect(all.get(t.id)).toEqual(transitionGeometry(t, g))
+    expect(edgeGeometries(g)).toBe(all)
   })
 })
 
