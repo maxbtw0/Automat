@@ -22,7 +22,7 @@ import {
   type TransitionLabel
 } from '@/model/graph'
 import type { TapeSnapshot } from './types'
-import { tokenizeWord } from './word'
+import { joinWord, tokenizeWord } from './word'
 
 /**
  * Kantenbeschriftungen als Text – für Canvas, Eingabefelder, Tabellen und Export.
@@ -75,17 +75,8 @@ const isTuringLabel = (label: TransitionLabel): boolean =>
  * „AB“. Wer formatiert und wieder einliest, muss Γ deshalb mitgeben.
  */
 export function formatStackWord(symbols: string[], stackAlphabet?: string[]): string {
-  if (symbols.length === 0) return EPSILON
-  if (symbols.some((s) => s.length > 1)) return symbols.join(' ')
-  const joined = symbols.join('')
-  if (stackAlphabet && !sameSymbols(parseStackWord(joined, stackAlphabet), symbols)) {
-    return symbols.join(' ')
-  }
-  return joined
+  return symbols.length === 0 ? EPSILON : joinWord(symbols, stackAlphabet)
 }
-
-const sameSymbols = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((s, i) => s === b[i])
 
 /** Stackinhalt (oben = letztes Element) wie im Lehrbuch: oberstes Symbol links. */
 export function formatStack(stack: string[], stackAlphabet?: string[]): string {

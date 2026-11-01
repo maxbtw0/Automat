@@ -727,6 +727,12 @@ function TooltipsPage() {
               <>
                 <code>-&gt;</code> oder <code>/</code> statt →
               </>
+            ],
+            [
+              'Eingabewort',
+              <>
+                <code>a b</code> – Leerzeichen trennen Symbole, z. B. bei Σ = {'{'}a, b, ab{'}'}
+              </>
             ]
           ]}
         />

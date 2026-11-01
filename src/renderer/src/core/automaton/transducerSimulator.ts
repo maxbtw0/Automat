@@ -10,7 +10,7 @@ import {
 } from '@/model/graph'
 import type { SimulationResult, SimulationStep, Simulator } from './types'
 import { startState } from './validation'
-import { tokenizeWord } from './word'
+import { joinWord, tokenizeWord } from './word'
 
 /** Die Regel, mit der der Zustand das Symbol liest – bei einem gültigen Transduktor höchstens eine. */
 function findRule(
@@ -66,10 +66,10 @@ export class TransducerSimulator implements Simulator {
         activeStateIds: state === null ? [] : [state],
         usedTransitionIds: edge ? [edge.id] : [],
         get consumed() {
-          return tokens.slice(0, read).join('')
+          return joinWord(tokens.slice(0, read), document.alphabet)
         },
         get remaining() {
-          return tokens.slice(read).join('')
+          return joinWord(tokens.slice(read), document.alphabet)
         },
         symbol: read > 0 ? tokens[read - 1] : null,
         inputPosition: read,

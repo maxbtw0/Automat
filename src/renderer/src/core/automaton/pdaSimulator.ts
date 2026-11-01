@@ -11,7 +11,7 @@ import { asPushdown } from './labels'
 import { simulationLimits } from './limits'
 import type { SimulationResult, SimulationStep, Simulator } from './types'
 import { startState } from './validation'
-import { tokenizeWord } from './word'
+import { joinWord, tokenizeWord } from './word'
 
 /** Standard: so viele Konfigurationen untersucht die Suche höchstens */
 export const CONFIGURATION_LIMIT = DEFAULT_SIMULATION.pdaConfigurationLimit
@@ -161,6 +161,7 @@ export function searchPushdown(
  */
 export class PushdownSimulator implements Simulator {
   private readonly tokens: string[]
+  private readonly alphabet: string[]
   private readonly search: PushdownSearch
   private position = 0
 
@@ -168,6 +169,7 @@ export class PushdownSimulator implements Simulator {
     document: AutomatonDocument,
     readonly word: string
   ) {
+    this.alphabet = document.alphabet
     this.tokens = tokenizeWord(word, document.alphabet)
     this.search = searchPushdown(document, this.tokens)
   }
@@ -208,16 +210,16 @@ export class PushdownSimulator implements Simulator {
   /** Gelesener Teil und Rest entstehen erst beim Lesen – jeder Schritt bleibt klein. */
   private snapshot(): SimulationStep {
     const c = this.search.path[this.position]
-    const { tokens } = this
+    const { tokens, alphabet } = this
     return {
       index: this.position,
       activeStateIds: c.state === null ? [] : [c.state],
       usedTransitionIds: c.edge ? [c.edge.id] : [],
       get consumed() {
-        return tokens.slice(0, c.position).join('')
+        return joinWord(tokens.slice(0, c.position), alphabet)
       },
       get remaining() {
-        return tokens.slice(c.position).join('')
+        return joinWord(tokens.slice(c.position), alphabet)
       },
       symbol: c.label ? c.label.read : null,
       inputPosition: c.position,

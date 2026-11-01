@@ -22,7 +22,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Angefangene Eingaben werden vor Neu, Öffnen, Speichern, Export und Schließen übernommen',
       'Reguläre Ausdrücke trennen Symbole mit mehreren Zeichen durch Leerzeichen',
       'Der NEA liest ein „ε“ im Eingabewort nicht mehr über einen ε-Übergang',
-      'Export sehr langer Simulationen funktioniert wieder, auch als PDF'
+      'Export sehr langer Simulationen funktioniert wieder, auch als PDF',
+      'Leerzeichen trennen Symbole im Eingabewort: bei Σ = {a, b, ab} ist „a b“ zwei Symbole'
     ]
   },
   {

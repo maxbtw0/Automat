@@ -10,7 +10,7 @@ import { asTuring } from './labels'
 import { simulationLimits } from './limits'
 import type { SimulationResult, SimulationStep, Simulator, TapeSnapshot } from './types'
 import { startState } from './validation'
-import { tokenizeWord } from './word'
+import { joinWord, tokenizeWord } from './word'
 
 /**
  * Standard-Schrittlimit – eine Turingmaschine hält nicht immer. Gilt, solange die Einstellungen
@@ -190,6 +190,8 @@ const OFFSET: Record<string, number> = { L: -1, R: 1, N: 0 }
 export class TuringSimulator implements Simulator {
   private readonly tokens: string[]
   private readonly blank: string
+  /** Bandalphabet Γ – für gelesenen Teil und Rest als Text */
+  private readonly gamma: string[]
   private readonly start: StateId | null
   private readonly finals: Set<StateId>
   /** Zustand → Lesesymbol → Regel (bei Nichtdeterminismus gewinnt die erste) */
@@ -215,6 +217,7 @@ export class TuringSimulator implements Simulator {
     this.tokens = tokenizeWord(word, document.alphabet)
     this.foreign = this.tokens.find((t) => !document.alphabet.includes(t)) ?? null
     this.blank = tapeSettings(document).blank
+    this.gamma = tapeSettings(document).alphabet
     this.start = startState(graph)?.id ?? null
     this.finals = new Set(graph.states.filter((s) => s.isFinal).map((s) => s.id))
     for (const edge of graph.transitions) {
@@ -312,6 +315,7 @@ export class TuringSimulator implements Simulator {
     const history = this.history
     const step = this.count
     const head = this.head
+    const gamma = this.gamma
     const tape = (): TapeSnapshot => history.snapshot(step, head)
     return {
       index: step,
@@ -319,11 +323,11 @@ export class TuringSimulator implements Simulator {
       usedTransitionIds: this.lastEdge ? [this.lastEdge.id] : [],
       get consumed() {
         const { start, symbols } = tape()
-        return symbols.slice(0, head - start).join('')
+        return joinWord(symbols.slice(0, head - start), gamma)
       },
       get remaining() {
         const { start, symbols } = tape()
-        return symbols.slice(head - start).join('')
+        return joinWord(symbols.slice(head - start), gamma)
       },
       symbol: this.lastLabel ? this.lastLabel.read : null,
       inputPosition: head,

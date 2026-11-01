@@ -9,7 +9,7 @@ import {
 } from '@/model/graph'
 import type { SimulationResult, SimulationStep, Simulator } from './types'
 import { startState } from './validation'
-import { tokenizeWord } from './word'
+import { joinWord, tokenizeWord } from './word'
 
 export interface StateSetResult {
   states: Set<StateId>
@@ -188,15 +188,16 @@ export class StateSetSimulator implements Simulator {
   private snapshot(): SimulationStep {
     const { stateIds, transitionIds } = this.shown[this.position]
     const { tokens, position } = this
+    const { alphabet } = this.document
     return {
       index: position,
       activeStateIds: stateIds,
       usedTransitionIds: transitionIds,
       get consumed() {
-        return tokens.slice(0, position).join('')
+        return joinWord(tokens.slice(0, position), alphabet)
       },
       get remaining() {
-        return tokens.slice(position).join('')
+        return joinWord(tokens.slice(position), alphabet)
       },
       symbol: position > 0 ? tokens[position - 1] : null,
       inputPosition: position
