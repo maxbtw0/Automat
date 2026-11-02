@@ -42,6 +42,14 @@ describe('regexToDocument', () => {
     expect(doc.alphabet).toEqual(['a', 'b', 'c'])
   })
 
+  it('wirft, wenn Ausdruck und bisheriges Alphabet zusammen mehrdeutig wären', () => {
+    for (const kind of ['dfa', 'nfa'] as const) {
+      expect(() => regexToDocument(parseRegex('a', ['ab']), kind, ['ab'])).toThrow(
+        '„a“ einzeln und in „ab“'
+      )
+    }
+  })
+
   it('∅ wird der minimale vollständige DEA: ein Zustand mit Schleife', () => {
     const doc = regexToDocument(parseRegex('∅'), 'dfa', ['a', 'b'])
     expect(doc.graph.states).toEqual([

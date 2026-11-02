@@ -70,6 +70,12 @@ export function RegularExpressionScreen() {
       setBuildError(parsed.error)
       return
     }
+    // Erst bauen (kann am Alphabet scheitern), dann fragen – der bisherige Automat bleibt
+    const result = attempt(() => regexToDocument(parsed.value, buildKind, doc.alphabet))
+    if (!result.ok) {
+      setBuildError(result.error)
+      return
+    }
     setBuildError(null)
     if (doc.graph.states.length > 0) {
       const choice = await askChoice({
@@ -77,11 +83,6 @@ export function RegularExpressionScreen() {
         buttons: ['Ersetzen', 'Abbrechen']
       })
       if (choice !== 0) return
-    }
-    const result = attempt(() => regexToDocument(parsed.value, buildKind, doc.alphabet))
-    if (!result.ok) {
-      setBuildError(result.error)
-      return
     }
     const store = useEditorStore.getState()
     store.applyDocument(result.value)

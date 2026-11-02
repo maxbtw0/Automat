@@ -1,3 +1,4 @@
+import { alphabetOverlap } from '@shared/alphabetRules'
 import { completeDfa } from '@/core/algorithms/complete'
 import { layoutByDepth, relabelInOrder } from '@/core/algorithms/layout'
 import { minimizeDfa } from '@/core/algorithms/minimize'
@@ -36,8 +37,9 @@ function mergeParallelEdges(graph: EditorGraph): EditorGraph {
  * - `dfa`: Thompson → Potenzmengenkonstruktion → Minimierung → Vervollständigen
  *   = minimaler vollständiger DEA (fehlende Übergänge führen in den Fangzustand „trap“)
  *
- * Σ = bisheriges Alphabet ∪ Symbole des Ausdrucks. Zustände heißen q0, q1, … in
- * Besuchsreihenfolge und sind in Spalten nach Abstand vom Start angeordnet.
+ * Σ = bisheriges Alphabet ∪ Symbole des Ausdrucks. Wirft, wenn diese Vereinigung die
+ * Alphabetregel verletzt (Σ = {ab}, Ausdruck „a“ → „„a“ einzeln und in „ab““). Zustände heißen
+ * q0, q1, … in Besuchsreihenfolge und sind in Spalten nach Abstand vom Start angeordnet.
  */
 export function regexToDocument(
   regex: Regex,
@@ -45,6 +47,8 @@ export function regexToDocument(
   baseAlphabet: string[] = []
 ): AutomatonDocument {
   const alphabet = [...new Set([...baseAlphabet, ...regexSymbols(regex)])].sort(compareSymbols)
+  const overlap = alphabetOverlap(alphabet)
+  if (overlap) throw new Error(overlap)
   const machine = regexToMachine(regex)
   const graph = mergeParallelEdges({
     states: machine.graph.states.map((s) => ({
