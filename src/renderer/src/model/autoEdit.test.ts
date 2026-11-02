@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import abStarA from '../../../../beispiele/autoedit/ab-stern-a-dea.xml?raw'
 import epsilonNfa from '../../../../beispiele/autoedit/epsilon-nea.xml?raw'
+import atoccNfa from '../../../../beispiele/autoedit/atocc-1_2_1_1-nea.xml?raw'
+import atoccDfa from '../../../../beispiele/autoedit/atocc-1_2_1_2-dea.xml?raw'
+import atoccSentence from '../../../../beispiele/autoedit/atocc-1_2_2_1-nea.xml?raw'
+import atoccDpda from '../../../../beispiele/autoedit/atocc-2_1_1_1-dka.xml?raw'
+import atoccNpdaPalindromes from '../../../../beispiele/autoedit/atocc-2_2_1_1-nka.xml?raw'
+import atoccNpdaEqual from '../../../../beispiele/autoedit/atocc-2_2_1_2-nka.xml?raw'
+import atoccNpdaAnBn from '../../../../beispiele/autoedit/atocc-2_2_1_3-nka.xml?raw'
+import atoccParity from '../../../../beispiele/autoedit/atocc-3_1_1_1-tm.xml?raw'
+import atoccAnBnCn from '../../../../beispiele/autoedit/atocc-3_1_1_2-tm.xml?raw'
+import atoccEqual from '../../../../beispiele/autoedit/atocc-3_1_1_3-tm.xml?raw'
 import { createAutomaton } from '@/core/automaton/registry'
 import { allWords } from '@/core/automaton/testing'
+import { TuringSimulator } from '@/core/automaton/tmSimulator'
 import { STATE_RADIUS } from '@/utils/geometry'
 import { parseXml } from '@/utils/xml'
 import { importAutoEdit, looksLikeXml } from './autoEdit'
@@ -44,11 +55,17 @@ describe('importAutoEdit', () => {
       isStart,
       isFinal
     }))
+    // q_0 und q_2 stehen nur 140 auseinander → gestreckt auf 150, q_0 (links oben) bleibt
+    const factor = 150 / Math.hypot(225 - 175, 286 - 155)
+    const at = (left: number, top: number) => ({
+      x: 175 + R + (left - 175) * factor,
+      y: 155 + R + (top - 155) * factor
+    })
     expect(states).toEqual([
-      { label: 'q0', x: 175 + R, y: 155 + R, isStart: true, isFinal: false },
-      { label: 'q1', x: 459 + R, y: 175 + R, isStart: false, isFinal: false },
-      { label: 'q2', x: 225 + R, y: 286 + R, isStart: false, isFinal: true },
-      { label: 'trap', x: 400 + R, y: 334 + R, isStart: false, isFinal: false }
+      { label: 'q0', ...at(175, 155), isStart: true, isFinal: false },
+      { label: 'q1', ...at(459, 175), isStart: false, isFinal: false },
+      { label: 'q2', ...at(225, 286), isStart: false, isFinal: true },
+      { label: 'trap', ...at(400, 334), isStart: false, isFinal: false }
     ])
 
     const name = (id: string): string | undefined =>
@@ -110,9 +127,14 @@ describe('importAutoEdit', () => {
   })
 
   it('meldet unbekannte Typen und kaputte Dateien', () => {
-    expect(() => importAutoEdit('<AUTOMATON><TYPE value="TM"/></AUTOMATON>')).toThrow(
-      'AutoEdit-Typ „TM“ wird nicht unterstützt.'
+    expect(() => importAutoEdit('<AUTOMATON><TYPE value="MOORE"/></AUTOMATON>')).toThrow(
+      'AutoEdit-Typ „MOORE“ wird nicht unterstützt.'
     )
+    expect(() =>
+      importAutoEdit(`<AUTOMATON><TYPE value="TM"/><STATE name="q">
+        <TRANSITION target="q"><LABEL read="a" write="a" direction="UP"/></TRANSITION>
+      </STATE></AUTOMATON>`)
+    ).toThrow('Richtung „UP“ unbekannt')
     expect(() => importAutoEdit('<FOO/>')).toThrow('Das ist keine AutoEdit-Datei.')
     expect(() => importAutoEdit('<AUTOMATON>')).toThrow('kein gültiges XML')
     expect(() =>
@@ -122,6 +144,100 @@ describe('importAutoEdit', () => {
     ).toThrow('Übergang zu unbekanntem Zustand „b“')
   })
 
+  it('liest die Lösungen von atocc.de für DEA und NEA', () => {
+    const contains = (w: string) => w.includes('aba')
+    for (const text of [atoccNfa, atoccDfa]) {
+      const automaton = createAutomaton(importAutoEdit(text))
+      expect(automaton.validate()).toEqual([])
+      for (const w of allWords(['a', 'b'], 7)) expect(automaton.accepts(w), w).toBe(contains(w))
+    }
+
+    // Mehrzeichen-Symbole und ε neben einem Symbol am selben Übergang
+    const sentence = createAutomaton(importAutoEdit(atoccSentence))
+    expect(sentence.validate()).toEqual([])
+    expect(sentence.accepts('Artikel Adjektiv Substantiv Verb')).toBe(true)
+    expect(sentence.accepts('Artikel Substantiv Verb Adverb')).toBe(true)
+    expect(sentence.accepts('Artikel Verb')).toBe(false)
+  })
+})
+
+describe('importAutoEdit – Kellerautomat', () => {
+  const isAnBn = (w: string) => /^(a+)(b+)$/.test(w) && w.length === 2 * w.indexOf('b')
+  const count = (w: string, c: string) => w.split(c).length - 1
+
+  it('liest Γ, Startsymbol und Regeln mit Push-Wort', () => {
+    const doc = importAutoEdit(atoccDpda)
+    expect(doc.type).toBe('DPDA')
+    expect(doc.stack).toEqual({ alphabet: ['$', 'A'], start: '$', acceptance: 'final' })
+    const rules = doc.graph.transitions.flatMap((t) => t.labels)
+    expect(rules).toContainEqual({ read: 'a', pop: '$', push: ['A', '$'] })
+    expect(rules).toContainEqual({ read: EPSILON, pop: '$', push: [] })
+  })
+
+  it('erkennt mit den Lösungen dieselben Sprachen wie die Aufgaben', () => {
+    const cases: [string, (w: string) => boolean][] = [
+      [atoccDpda, isAnBn],
+      [atoccNpdaAnBn, isAnBn],
+      [atoccNpdaPalindromes, (w) => w === [...w].reverse().join('')],
+      [atoccNpdaEqual, (w) => count(w, 'a') === count(w, 'b')]
+    ]
+    for (const [text, inLanguage] of cases) {
+      const automaton = createAutomaton(importAutoEdit(text))
+      expect(automaton.validate()).toEqual([])
+      for (const w of allWords(['a', 'b'], 6)) expect(automaton.accepts(w), w).toBe(inLanguage(w))
+    }
+  })
+
+  it('übernimmt einen eigenen Radius aus dem Layout', () => {
+    const [start] = importAutoEdit(atoccNpdaPalindromes).graph.states
+    expect([start.label, start.x, start.y]).toEqual(['Start', 200, 150])
+  })
+})
+
+describe('importAutoEdit – Turingmaschine', () => {
+  it('liest Γ mit dem Blank am Ende und die Bewegungen', () => {
+    const doc = importAutoEdit(atoccParity)
+    expect(doc.type).toBe('TM')
+    expect(doc.tape).toEqual({ alphabet: ['0', '1', '$'], blank: '$' })
+    const rules = doc.graph.transitions.flatMap((t) => t.labels)
+    expect(rules).toContainEqual({ read: '1', write: '1', move: 'R' })
+    expect(rules).toContainEqual({ read: '$', write: '0', move: 'N' })
+  })
+
+  it('hängt das Paritätsbit an', () => {
+    const doc = importAutoEdit(atoccParity)
+    expect(createAutomaton(doc).validate()).toEqual([])
+    for (const w of allWords(['0', '1'], 5)) {
+      const sim = new TuringSimulator(doc, w)
+      expect(sim.run().accepted, w).toBe(true)
+      expect(sim.output.join(''), w).toBe(w + ((w.split('1').length - 1) % 2))
+    }
+  })
+
+  it('erkennt aⁿbⁿcⁿ', () => {
+    const automaton = createAutomaton(importAutoEdit(atoccAnBnCn))
+    expect(automaton.validate()).toEqual([])
+    const isAnBnCn = (w: string) => {
+      const n = w.length / 3
+      return w === 'a'.repeat(n) + 'b'.repeat(n) + 'c'.repeat(n)
+    }
+    for (const w of allWords(['a', 'b', 'c'], 6)) {
+      expect(automaton.accepts(w), w).toBe(isAnBnCn(w))
+    }
+  })
+
+  it('vergleicht x=y und behält „q0“ neben „q_0“', () => {
+    const doc = importAutoEdit(atoccEqual)
+    expect(doc.graph.states.map((s) => s.label)).toContain('q_0')
+    const automaton = createAutomaton(doc)
+    expect(automaton.validate()).toEqual([])
+    for (const w of allWords(['0', '1', '='], 5)) {
+      expect(automaton.accepts(w), w).toBe(/^([01]+)=\1$/.test(w))
+    }
+  })
+})
+
+describe('looksLikeXml', () => {
   it('erkennt XML am Anfang der Datei', () => {
     expect(looksLikeXml('﻿  <?xml version="1.0"?>')).toBe(true)
     expect(looksLikeXml('{"format":"automat"}')).toBe(false)

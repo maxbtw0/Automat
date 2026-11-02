@@ -1,0 +1,42 @@
+<AUTOMATON>
+    <TYPE value="NKA"/>
+    <ALPHABET>
+        <ITEM value="a"/>
+        <ITEM value="b"/>
+    </ALPHABET>
+    <STACKALPHABET>
+        <ITEM value="$"/>
+        <ITEM value="B"/>
+        <ITEM value="A"/>
+    </STACKALPHABET>
+    <STATE name="S" finalstate="false">
+        <TRANSITION target="S">
+            <LABEL read="a" topofstack="$" write="A$"/>
+            <LABEL read="a" topofstack="A" write="AA"/>
+            <LABEL read="a" topofstack="B" write="EPSILON"/>
+            <LABEL read="b" topofstack="B" write="BB"/>
+            <LABEL read="b" topofstack="A" write="EPSILON"/>
+            <LABEL read="b" topofstack="$" write="B$"/>
+        </TRANSITION>
+        <TRANSITION target="E">
+            <LABEL read="EPSILON" topofstack="$" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="E" finalstate="true"/>
+    <INITIALSTATE value="S"/>
+    <STACKINITIALCHAR value="$"/>
+    <LAYOUT>
+        <STATELAYOUT name="S">
+            <LEFT value="139"/>
+            <TOP value="181"/>
+            <TRANSITIONLAYOUT target="S" drawvertical="true">
+                <TOP value="-190"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="E" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="E">
+            <LEFT value="303"/>
+            <TOP value="181"/>
+        </STATELAYOUT>
+    </LAYOUT>
+</AUTOMATON>

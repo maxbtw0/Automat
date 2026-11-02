@@ -324,11 +324,11 @@ describe('Öffnen während weiterer Änderungen', () => {
 
   it('meldet einen gescheiterten Import', async () => {
     const pending = openFile('autoEdit')
-    await answerWith('<AUTOMATON><TYPE value="TM"/></AUTOMATON>')
+    await answerWith('<AUTOMATON><TYPE value="MOORE"/></AUTOMATON>')
     await pending
     expect(store().status).toEqual({
       kind: 'error',
-      text: 'Import fehlgeschlagen: AutoEdit-Typ „TM“ wird nicht unterstützt.'
+      text: 'Import fehlgeschlagen: AutoEdit-Typ „MOORE“ wird nicht unterstützt.'
     })
   })
 })

@@ -1,15 +1,21 @@
 import { layoutByDepth } from '@/core/algorithms/layout'
+import { tokenizeWord } from '@/core/automaton/word'
 import { STATE_RADIUS } from '@/utils/geometry'
 import { childNamed, childrenNamed, parseXml, type XmlElement } from '@/utils/xml'
 import {
   createEmptyDocument,
   createId,
+  createTapeSettings,
   EPSILON,
   normalizeSymbol,
   type AutomatonDocument,
   type AutomatonType,
+  type StackSettings,
   type StateNode,
-  type TransitionEdge
+  type TapeMove,
+  type TapeSettings,
+  type TransitionEdge,
+  type TransitionLabel
 } from './graph'
 
 /**
@@ -26,9 +32,22 @@ import {
  *   <LAYOUT><STATELAYOUT name="q_0"><LEFT value="175"/><TOP value="155"/></STATELAYOUT></LAYOUT>
  * </AUTOMATON>
  * ```
+ *
+ * Kellerautomat (DKA/NKA): `STACKALPHABET`, `STACKINITIALCHAR`, Regeln
+ * `<LABEL read="a" topofstack="$" write="A$"/>` (Push als ein Wort, links = oben).
+ * Turingmaschine (TM): `TAPEALPHABET`, `TAPEINITIALCHAR` = Blank, Regeln
+ * `<LABEL read="a" write="X" direction="RIGHT"/>` (LEFT, RIGHT, NONE).
  */
 
-const TYPES: Record<string, AutomatonType> = { DEA: 'DFA', NEA: 'NFA' }
+const TYPES: Record<string, AutomatonType> = {
+  DEA: 'DFA',
+  NEA: 'NFA',
+  DKA: 'DPDA',
+  NKA: 'NPDA',
+  TM: 'TM'
+}
+
+const MOVES: Record<string, TapeMove> = { LEFT: 'L', RIGHT: 'R', NONE: 'N' }
 
 /** Sieht der Text nach XML aus (statt nach einer Automat-Datei)? */
 export function looksLikeXml(text: string): boolean {
@@ -55,18 +74,104 @@ function plainNames(names: string[]): string[] {
   return new Set(plain).size === names.length ? plain : names
 }
 
-/** Position aus dem Layout: AutoEdit speichert die linke obere Ecke, Automat den Mittelpunkt. */
+/**
+ * Position aus dem Layout: AutoEdit speichert die linke obere Ecke (Radius über `RADIUS`),
+ * Automat den Mittelpunkt.
+ */
 function positions(root: XmlElement): Map<string, { x: number; y: number }> {
   const result = new Map<string, { x: number; y: number }>()
   const layout = childNamed(root, 'LAYOUT')
   for (const state of layout ? childrenNamed(layout, 'STATELAYOUT') : []) {
     const left = Number(valueOf(state, 'LEFT'))
     const top = Number(valueOf(state, 'TOP'))
+    const radius = Number(valueOf(state, 'RADIUS') ?? STATE_RADIUS)
+    const r = Number.isFinite(radius) && radius > 0 ? radius : STATE_RADIUS
     if (Number.isFinite(left) && Number.isFinite(top)) {
-      result.set(attribute(state, 'name'), { x: left + STATE_RADIUS, y: top + STATE_RADIUS })
+      result.set(attribute(state, 'name'), { x: left + r, y: top + r })
     }
   }
-  return result
+  return spreadOut(result)
+}
+
+/** So weit stehen zwei Zustände mindestens auseinander – sonst überlappen die Beschriftungen. */
+const MIN_DISTANCE = 150
+
+/**
+ * AutoEdit zeichnet kleiner und setzt Zustände oft dichter. Das ganze Layout wird dann
+ * gleichmäßig gestreckt (um die linke obere Ecke), die Anordnung bleibt erhalten.
+ */
+function spreadOut(
+  points: Map<string, { x: number; y: number }>
+): Map<string, { x: number; y: number }> {
+  const list = [...points.values()]
+  let closest = Infinity
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      closest = Math.min(closest, Math.hypot(list[i].x - list[j].x, list[i].y - list[j].y))
+    }
+  }
+  if (!(closest > 0 && closest < MIN_DISTANCE)) return points
+  const factor = MIN_DISTANCE / closest
+  const left = Math.min(...list.map((p) => p.x))
+  const top = Math.min(...list.map((p) => p.y))
+  return new Map(
+    [...points].map(([name, p]) => [
+      name,
+      { x: left + (p.x - left) * factor, y: top + (p.y - top) * factor }
+    ])
+  )
+}
+
+/** Symbole aus `<ALPHABET>`, `<STACKALPHABET>` usw. – ohne Doppelte und ohne ε */
+function items(root: XmlElement, name: string): string[] {
+  const element = childNamed(root, name)
+  return [
+    ...new Set(
+      (element ? childrenNamed(element, 'ITEM') : [])
+        .map((item) => normalizeSymbol(attribute(item, 'value')))
+        .filter((s) => s !== '' && s !== EPSILON)
+    )
+  ]
+}
+
+/** Γ und Startsymbol; Akzeptanz kennt AutoEdit nur über Endzustände. */
+function readStack(root: XmlElement): StackSettings {
+  const alphabet = items(root, 'STACKALPHABET')
+  const start = valueOf(root, 'STACKINITIALCHAR') ?? alphabet[0] ?? null
+  if (start !== null && !alphabet.includes(start)) alphabet.unshift(start)
+  return { alphabet, start, acceptance: 'final' }
+}
+
+/** Γ mit Σ ⊆ Γ und dem Blank am Ende – wie es der Store hält. */
+function readTape(root: XmlElement, alphabet: string[]): TapeSettings {
+  const tape = items(root, 'TAPEALPHABET')
+  const blank = valueOf(root, 'TAPEINITIALCHAR')
+  if (blank === undefined || blank === '') return createTapeSettings(alphabet)
+  const symbols = [...new Set([...tape, ...alphabet])].filter((s) => s !== blank)
+  return { alphabet: [...symbols, blank], blank }
+}
+
+function readLabel(
+  label: XmlElement,
+  type: AutomatonType,
+  stack: StackSettings | undefined
+): TransitionLabel {
+  const read = normalizeSymbol(attribute(label, 'read'))
+  if (stack) {
+    const write = normalizeSymbol(attribute(label, 'write'))
+    return {
+      read,
+      pop: normalizeSymbol(attribute(label, 'topofstack')),
+      push: write === EPSILON ? [] : tokenizeWord(write, stack.alphabet)
+    }
+  }
+  if (type === 'TM') {
+    const direction = attribute(label, 'direction')
+    const move = MOVES[direction.toUpperCase()]
+    if (!move) throw new Error(`Richtung „${direction}“ unbekannt`)
+    return { read, write: normalizeSymbol(attribute(label, 'write')), move }
+  }
+  return { read }
 }
 
 /** Liest eine AutoEdit-Datei. Wirft mit deutscher Meldung, wenn sie nicht passt. */
@@ -83,14 +188,10 @@ export function importAutoEdit(text: string): AutomatonDocument {
   const type = typeName === undefined ? undefined : TYPES[typeName.toUpperCase()]
   if (!type) throw new Error(`AutoEdit-Typ „${typeName ?? ''}“ wird nicht unterstützt.`)
 
-  const alphabetElement = childNamed(root, 'ALPHABET')
-  const alphabet = [
-    ...new Set(
-      (alphabetElement ? childrenNamed(alphabetElement, 'ITEM') : [])
-        .map((item) => normalizeSymbol(attribute(item, 'value')))
-        .filter((s) => s !== '' && s !== EPSILON)
-    )
-  ]
+  const alphabet = items(root, 'ALPHABET')
+  const document = createEmptyDocument(type, alphabet)
+  const stack = document.stack && readStack(root)
+  const tape = document.tape && readTape(root, alphabet)
 
   const stateElements = childrenNamed(root, 'STATE')
   const names = stateElements.map((s) => attribute(s, 'name'))
@@ -122,9 +223,10 @@ export function importAutoEdit(text: string): AutomatonDocument {
       const from = ids.get(names[i]) as string
       const key = `${from} ${to}`
       const edge = transitions.get(key) ?? { id: createId('t'), from, to, labels: [] }
-      for (const label of childrenNamed(transition, 'LABEL')) {
-        const read = normalizeSymbol(attribute(label, 'read'))
-        if (!edge.labels.some((l) => l.read === read)) edge.labels.push({ read })
+      for (const rule of childrenNamed(transition, 'LABEL')) {
+        const label = readLabel(rule, type, stack)
+        const text = JSON.stringify(label)
+        if (!edge.labels.some((l) => JSON.stringify(l) === text)) edge.labels.push(label)
       }
       if (edge.labels.length > 0) transitions.set(key, edge)
     }
@@ -132,7 +234,9 @@ export function importAutoEdit(text: string): AutomatonDocument {
 
   const graph = { states, transitions: [...transitions.values()] }
   return {
-    ...createEmptyDocument(type, alphabet),
+    ...document,
+    ...(stack && { stack }),
+    ...(tape && { tape }),
     // Ohne vollständiges Layout ordnet Automat selbst an
     graph: names.every((n) => layout.has(n)) ? graph : layoutByDepth(graph)
   }

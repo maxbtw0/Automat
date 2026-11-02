@@ -1,0 +1,65 @@
+<AUTOMATON>
+    <TYPE value="NEA"/>
+    <ALPHABET>
+        <ITEM value="Adjektiv"/>
+        <ITEM value="Artikel"/>
+        <ITEM value="Substantiv"/>
+        <ITEM value="Verb"/>
+        <ITEM value="Adverb"/>
+    </ALPHABET>
+    <STATE name="q0" finalstate="false">
+        <TRANSITION target="q1">
+            <LABEL read="Artikel"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q1" finalstate="false">
+        <TRANSITION target="q2">
+            <LABEL read="Substantiv"/>
+        </TRANSITION>
+        <TRANSITION target="q1">
+            <LABEL read="Adjektiv"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q2" finalstate="false">
+        <TRANSITION target="q3">
+            <LABEL read="Verb"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q3" finalstate="false">
+        <TRANSITION target="q4">
+            <LABEL read="Adverb"/>
+            <LABEL read="EPSILON"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q4" finalstate="true"/>
+    <INITIALSTATE value="q0"/>
+    <LAYOUT>
+        <STATELAYOUT name="q0">
+            <LEFT value="105"/>
+            <TOP value="77"/>
+            <TRANSITIONLAYOUT target="q1" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q1">
+            <LEFT value="237"/>
+            <TOP value="77"/>
+            <TRANSITIONLAYOUT target="q2" drawvertical="true"/>
+            <TRANSITIONLAYOUT target="q1" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+        </STATELAYOUT>
+        <STATELAYOUT name="q2">
+            <LEFT value="367"/>
+            <TOP value="77"/>
+            <TRANSITIONLAYOUT target="q3" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q3">
+            <LEFT value="367"/>
+            <TOP value="169"/>
+            <TRANSITIONLAYOUT target="q4" drawvertical="false"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q4">
+            <LEFT value="105"/>
+            <TOP value="169"/>
+        </STATELAYOUT>
+    </LAYOUT>
+</AUTOMATON>

@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AUTOMATON>
+    <TYPE value="TM"/>
+    <ALPHABET>
+        <ITEM value="0"/>
+        <ITEM value="1"/>
+        <ITEM value="="/>
+    </ALPHABET>
+    <TAPEALPHABET>
+        <ITEM value="$"/>
+        <ITEM value="-"/>
+        <ITEM value="0"/>
+        <ITEM value="1"/>
+        <ITEM value="="/>
+        <ITEM value="T"/>
+        <ITEM value="X"/>
+    </TAPEALPHABET>
+    <STATE name="q0" finalstate="false">
+        <TRANSITION target="q1">
+            <LABEL read="0" direction="RIGHT" write="$"/>
+        </TRANSITION>
+        <TRANSITION target="q2">
+            <LABEL read="1" direction="RIGHT" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q1" finalstate="false">
+        <TRANSITION target="q1">
+            <LABEL read="0" direction="RIGHT" write="0"/>
+            <LABEL read="1" direction="RIGHT" write="1"/>
+        </TRANSITION>
+        <TRANSITION target="q3">
+            <LABEL read="=" direction="RIGHT" write="="/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q2" finalstate="false">
+        <TRANSITION target="q2">
+            <LABEL read="0" direction="RIGHT" write="0"/>
+            <LABEL read="1" direction="RIGHT" write="1"/>
+        </TRANSITION>
+        <TRANSITION target="q4">
+            <LABEL read="=" direction="RIGHT" write="="/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q3" finalstate="false">
+        <TRANSITION target="q3">
+            <LABEL read="X" direction="RIGHT" write="X"/>
+        </TRANSITION>
+        <TRANSITION target="q5">
+            <LABEL read="0" direction="RIGHT" write="X"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q4" finalstate="false">
+        <TRANSITION target="q4">
+            <LABEL read="X" direction="RIGHT" write="X"/>
+        </TRANSITION>
+        <TRANSITION target="q5">
+            <LABEL read="1" direction="RIGHT" write="X"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q5" finalstate="false">
+        <TRANSITION target="q6">
+            <LABEL read="0" direction="LEFT" write="0"/>
+            <LABEL read="1" direction="LEFT" write="1"/>
+            <LABEL read="X" direction="LEFT" write="X"/>
+        </TRANSITION>
+        <TRANSITION target="q7">
+            <LABEL read="$" direction="LEFT" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q6" finalstate="false">
+        <TRANSITION target="q6">
+            <LABEL read="0" direction="LEFT" write="0"/>
+            <LABEL read="1" direction="LEFT" write="1"/>
+            <LABEL read="=" direction="LEFT" write="="/>
+            <LABEL read="X" direction="LEFT" write="X"/>
+        </TRANSITION>
+        <TRANSITION target="q0">
+            <LABEL read="$" direction="RIGHT" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q7" finalstate="false">
+        <TRANSITION target="q7">
+            <LABEL read="X" direction="LEFT" write="$"/>
+        </TRANSITION>
+        <TRANSITION target="q9">
+            <LABEL read="=" direction="LEFT" write="="/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q8" finalstate="false">
+        <TRANSITION target="q_0">
+            <LABEL read="=" direction="NONE" write="T"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q9" finalstate="false">
+        <TRANSITION target="q9">
+            <LABEL read="0" direction="LEFT" write="0"/>
+            <LABEL read="1" direction="LEFT" write="1"/>
+        </TRANSITION>
+        <TRANSITION target="q8">
+            <LABEL read="$" direction="RIGHT" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q_0" finalstate="true"/>
+    <INITIALSTATE value="q0"/>
+    <TAPEINITIALCHAR value="$"/>
+    <LAYOUT>
+        <STATELAYOUT name="q0">
+            <LEFT value="109"/>
+            <TOP value="223"/>
+            <TRANSITIONLAYOUT target="q1" drawvertical="true"/>
+            <TRANSITIONLAYOUT target="q2" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q1">
+            <LEFT value="229"/>
+            <TOP value="169"/>
+            <TRANSITIONLAYOUT target="q1" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q3" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q2">
+            <LEFT value="229"/>
+            <TOP value="296"/>
+            <TRANSITIONLAYOUT target="q2" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q4" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q3">
+            <LEFT value="359"/>
+            <TOP value="169"/>
+            <TRANSITIONLAYOUT target="q3" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q5" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q4">
+            <LEFT value="359"/>
+            <TOP value="296"/>
+            <TRANSITIONLAYOUT target="q4" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q5" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q5">
+            <LEFT value="443"/>
+            <TOP value="223"/>
+            <TRANSITIONLAYOUT target="q6" drawvertical="true"/>
+            <TRANSITIONLAYOUT target="q7" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q6">
+            <LEFT value="569"/>
+            <TOP value="223"/>
+            <TRANSITIONLAYOUT target="q6" drawvertical="true">
+                <TOP value="-162"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q0" drawvertical="true">
+                <LEFT value="-48"/>
+                <TOP value="279"/>
+            </TRANSITIONLAYOUT>
+        </STATELAYOUT>
+        <STATELAYOUT name="q7">
+            <LEFT value="443"/>
+            <TOP value="65"/>
+            <TRANSITIONLAYOUT target="q7" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q9" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q8">
+            <LEFT value="204"/>
+            <TOP value="65"/>
+            <TRANSITIONLAYOUT target="q_0" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q9">
+            <LEFT value="312"/>
+            <TOP value="65"/>
+            <TRANSITIONLAYOUT target="q9" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q8" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q_0">
+            <LEFT value="94"/>
+            <TOP value="65"/>
+        </STATELAYOUT>
+        <NOTEPAD>
+            {\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fnil\fcharset0 Arial;}}
+\viewkind4\uc1\pard\lang1031\fs18 
+\par }
+
+        </NOTEPAD>
+    </LAYOUT>
+</AUTOMATON>

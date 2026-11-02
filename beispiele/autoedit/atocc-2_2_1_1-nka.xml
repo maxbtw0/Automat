@@ -1,0 +1,57 @@
+<AUTOMATON>
+    <TYPE value="NKA"/>
+    <ALPHABET>
+        <ITEM value="a"/>
+        <ITEM value="b"/>
+    </ALPHABET>
+    <STACKALPHABET>
+        <ITEM value="$"/>
+        <ITEM value="a"/>
+        <ITEM value="b"/>
+        <ITEM value="S"/>
+    </STACKALPHABET>
+    <STATE name="Start" finalstate="false">
+        <TRANSITION target="Work">
+            <LABEL read="EPSILON" topofstack="$" write="S$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="Work" finalstate="false">
+        <TRANSITION target="Halt">
+            <LABEL read="EPSILON" topofstack="$" write="EPSILON"/>
+        </TRANSITION>
+        <TRANSITION target="Work">
+            <LABEL read="EPSILON" topofstack="S" write="EPSILON"/>
+            <LABEL read="EPSILON" topofstack="S" write="a"/>
+            <LABEL read="EPSILON" topofstack="S" write="bSb"/>
+            <LABEL read="EPSILON" topofstack="S" write="b"/>
+            <LABEL read="EPSILON" topofstack="S" write="aSa"/>
+            <LABEL read="a" topofstack="a" write="EPSILON"/>
+            <LABEL read="b" topofstack="b" write="EPSILON"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="Halt" finalstate="true"/>
+    <INITIALSTATE value="Start"/>
+    <STACKINITIALCHAR value="$"/>
+    <LAYOUT>
+        <STATELAYOUT name="Start">
+            <LEFT value="150"/>
+            <TOP value="100"/>
+            <RADIUS value="50"/>
+            <TRANSITIONLAYOUT target="Work" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="Work">
+            <LEFT value="350"/>
+            <TOP value="100"/>
+            <RADIUS value="50"/>
+            <TRANSITIONLAYOUT target="Halt" drawvertical="true"/>
+            <TRANSITIONLAYOUT target="Work" drawvertical="true">
+                <TOP value="400"/>
+            </TRANSITIONLAYOUT>
+        </STATELAYOUT>
+        <STATELAYOUT name="Halt">
+            <LEFT value="550"/>
+            <TOP value="100"/>
+            <RADIUS value="50"/>
+        </STATELAYOUT>
+    </LAYOUT>
+</AUTOMATON>

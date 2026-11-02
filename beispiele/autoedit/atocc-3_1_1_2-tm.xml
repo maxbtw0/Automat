@@ -1,0 +1,117 @@
+<AUTOMATON>
+    <TYPE value="TM"/>
+    <ALPHABET>
+        <ITEM value="a"/>
+        <ITEM value="b"/>
+        <ITEM value="c"/>
+    </ALPHABET>
+    <TAPEALPHABET>
+        <ITEM value="$"/>
+        <ITEM value="a"/>
+        <ITEM value="b"/>
+        <ITEM value="c"/>
+        <ITEM value="X"/>
+        <ITEM value="-"/>
+    </TAPEALPHABET>
+    <STATE name="q0" finalstate="false">
+        <TRANSITION target="q1">
+            <LABEL read="a" direction="RIGHT" write="X"/>
+        </TRANSITION>
+        <TRANSITION target="q0">
+            <LABEL read="-" direction="RIGHT" write="-"/>
+        </TRANSITION>
+        <TRANSITION target="q5">
+            <LABEL read="$" direction="NONE" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q1" finalstate="false">
+        <TRANSITION target="q1">
+            <LABEL read="-" direction="RIGHT" write="-"/>
+            <LABEL read="a" direction="RIGHT" write="a"/>
+        </TRANSITION>
+        <TRANSITION target="q2">
+            <LABEL read="b" direction="RIGHT" write="X"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q2" finalstate="false">
+        <TRANSITION target="q2">
+            <LABEL read="-" direction="RIGHT" write="-"/>
+            <LABEL read="b" direction="RIGHT" write="b"/>
+        </TRANSITION>
+        <TRANSITION target="q3">
+            <LABEL read="c" direction="RIGHT" write="X"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q3" finalstate="false">
+        <TRANSITION target="q3">
+            <LABEL read="c" direction="RIGHT" write="c"/>
+        </TRANSITION>
+        <TRANSITION target="q4">
+            <LABEL read="$" direction="LEFT" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q4" finalstate="false">
+        <TRANSITION target="q4">
+            <LABEL read="-" direction="LEFT" write="-"/>
+            <LABEL read="X" direction="LEFT" write="-"/>
+            <LABEL read="a" direction="LEFT" write="a"/>
+            <LABEL read="b" direction="LEFT" write="b"/>
+            <LABEL read="c" direction="LEFT" write="c"/>
+        </TRANSITION>
+        <TRANSITION target="q0">
+            <LABEL read="$" direction="RIGHT" write="$"/>
+        </TRANSITION>
+    </STATE>
+    <STATE name="q5" finalstate="true"/>
+    <INITIALSTATE value="q0"/>
+    <TAPEINITIALCHAR value="$"/>
+    <LAYOUT>
+        <STATELAYOUT name="q0">
+            <LEFT value="97"/>
+            <TOP value="193"/>
+            <TRANSITIONLAYOUT target="q1" drawvertical="true"/>
+            <TRANSITIONLAYOUT target="q0" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q5" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q1">
+            <LEFT value="199"/>
+            <TOP value="193"/>
+            <TRANSITIONLAYOUT target="q1" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q2" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q2">
+            <LEFT value="299"/>
+            <TOP value="193"/>
+            <TRANSITIONLAYOUT target="q2" drawvertical="true">
+                <TOP value="-120"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q3" drawvertical="true">
+                <TOP value="-14"/>
+            </TRANSITIONLAYOUT>
+        </STATELAYOUT>
+        <STATELAYOUT name="q3">
+            <LEFT value="299"/>
+            <TOP value="291"/>
+            <TRANSITIONLAYOUT target="q3" drawvertical="true">
+                <TOP value="118"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q4" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q4">
+            <LEFT value="97"/>
+            <TOP value="291"/>
+            <TRANSITIONLAYOUT target="q4" drawvertical="true">
+                <TOP value="168"/>
+            </TRANSITIONLAYOUT>
+            <TRANSITIONLAYOUT target="q0" drawvertical="true"/>
+        </STATELAYOUT>
+        <STATELAYOUT name="q5">
+            <LEFT value="199"/>
+            <TOP value="65"/>
+        </STATELAYOUT>
+    </LAYOUT>
+</AUTOMATON>
