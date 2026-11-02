@@ -6,6 +6,8 @@ import { nfaToDfa } from '@/core/algorithms/subsetConstruction'
 import {
   compareSymbols,
   createId,
+  EPSILON,
+  normalizeSymbol,
   readsSymbol,
   type AutomatonDocument,
   type EditorGraph,
@@ -38,7 +40,8 @@ function mergeParallelEdges(graph: EditorGraph): EditorGraph {
  *   = minimaler vollständiger DEA (fehlende Übergänge führen in den Fangzustand „trap“)
  *
  * Σ = bisheriges Alphabet ∪ Symbole des Ausdrucks. Wirft, wenn diese Vereinigung die
- * Alphabetregel verletzt (Σ = {ab}, Ausdruck „a“ → „„a“ einzeln und in „ab““). Zustände heißen
+ * Alphabetregel verletzt (Σ = {ab}, Ausdruck „a“ → „„a“ einzeln und in „ab““) oder ein Symbol
+ * als ε gilt („Ε“). Zustände heißen
  * q0, q1, … in Besuchsreihenfolge und sind in Spalten nach Abstand vom Start angeordnet.
  */
 export function regexToDocument(
@@ -47,6 +50,9 @@ export function regexToDocument(
   baseAlphabet: string[] = []
 ): AutomatonDocument {
   const alphabet = [...new Set([...baseAlphabet, ...regexSymbols(regex)])].sort(compareSymbols)
+  // Dieselben Regeln wie im Alphabeteditor: „Ε“ oder „EPS“ wären als Symbol ε
+  const reserved = alphabet.find((symbol) => normalizeSymbol(symbol) === EPSILON)
+  if (reserved !== undefined) throw new Error(`„${reserved}“ ist ε, kein Symbol`)
   const overlap = alphabetOverlap(alphabet)
   if (overlap) throw new Error(overlap)
   const machine = regexToMachine(regex)

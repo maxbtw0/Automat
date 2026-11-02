@@ -50,6 +50,12 @@ describe('regexToDocument', () => {
     }
   })
 
+  it('wirft bei einem Symbol, das als ε gilt (großes griechisches Epsilon)', () => {
+    for (const kind of ['dfa', 'nfa'] as const) {
+      expect(() => regexToDocument(parseRegex('Ε'), kind)).toThrow('„Ε“ ist ε, kein Symbol')
+    }
+  })
+
   it('∅ wird der minimale vollständige DEA: ein Zustand mit Schleife', () => {
     const doc = regexToDocument(parseRegex('∅'), 'dfa', ['a', 'b'])
     expect(doc.graph.states).toEqual([
