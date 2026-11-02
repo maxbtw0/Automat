@@ -171,7 +171,11 @@ export class PushdownSimulator implements Simulator {
   ) {
     this.alphabet = document.alphabet
     this.tokens = tokenizeWord(word, document.alphabet)
-    this.search = searchPushdown(document, this.tokens)
+    const search = searchPushdown(document, this.tokens)
+    // Ein Zeichen außerhalb von Σ liest keine Regel – verworfen, auch wenn die Suche (etwa in
+    // einer ε-Schleife) an ein Limit stößt. Angezeigt wird trotzdem der am weitesten lesende Lauf.
+    const foreign = this.tokens.some((token) => !document.alphabet.includes(token))
+    this.search = foreign ? { ...search, accepted: false, abortReason: null } : search
   }
 
   get isFinished(): boolean {

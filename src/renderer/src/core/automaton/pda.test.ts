@@ -120,6 +120,26 @@ describe('Kellerautomat – Simulation', () => {
     expect(sim.undecided).toBe(true)
   })
 
+  it('verwirft ein Wort mit Zeichen außerhalb von Σ, statt am Limit abzubrechen', () => {
+    for (const type of ['DPDA', 'NPDA'] as const) {
+      const doc = buildDocument(type, ['a'], { start: 'q0', finals: ['q0'] }, [
+        ['q0', 'ε, # → ##', 'q0']
+      ])
+      const automaton = createAutomaton(doc)
+      expect(automaton.validate()).toEqual([])
+      expect(automaton.accepts('')).toBe(true)
+      for (const word of ['ε', 'eps', 'aε']) {
+        const sim = automaton.createSimulator(word)
+        expect(sim.run().accepted, word).toBe(false)
+        expect(sim.undecided, word).toBe(false)
+        expect(sim.abortReason, word).toBeNull()
+        expect(automaton.accepts(word), word).toBe(false)
+      }
+      // Wörter über Σ dürfen weiter am Limit abbrechen
+      expect(() => automaton.accepts('a')).toThrow(UndecidedError)
+    }
+  })
+
   it('verwechselt keine Konfigurationen, wenn IDs oder Stacksymbole „|“ enthalten', () => {
     // (a, 0, [1|y]) und (a|0, 1, [y]) ergaben früher denselben Schlüssel „a|0|1|y“
     const state = (id: string, isStart = false, isFinal = false) => ({
