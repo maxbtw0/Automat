@@ -26,6 +26,7 @@ import {
   type Settings
 } from '../shared/settings'
 import { safeWriteFile } from './safeWrite'
+import { createSequenceFolder } from './sequenceFolder'
 
 // Stürzt der GPU-Prozess mehr als sechsmal ab (z. B. Treiber-Resets im Standby), beendet
 // Chromium sonst die ganze App ohne Rückfrage. So startet er stattdessen einfach neu.
@@ -262,10 +263,12 @@ function registerIpcHandlers(): void {
         ? await dialog.showOpenDialog(win, options)
         : await dialog.showOpenDialog(options)
       if (result.canceled || result.filePaths.length === 0) return null
-      const folder = result.filePaths[0]
       if (!/^[a-z]+$/.test(extension)) throw new Error('Ungültige Endung')
+      const name = basename(baseName)
+      // Jede Serie bekommt einen eigenen, neuen Ordner – nie gemischt mit älteren Bildern
+      const folder = await createSequenceFolder(result.filePaths[0], name)
       const id = ++lastSequenceId
-      sequences.set(event.sender.id, { id, folder, baseName: basename(baseName), extension, count })
+      sequences.set(event.sender.id, { id, folder, baseName: name, extension, count })
       return { id, folder }
     }
   )

@@ -48,7 +48,7 @@ export interface OpenFileResult {
   data: Uint8Array
 }
 
-/** Eine begonnene Bildfolge: Nummer des Auftrags und gewählter Ordner */
+/** Eine begonnene Bildfolge: Nummer des Auftrags und der neu angelegte Ordner der Serie */
 export interface ExportSequence {
   id: number
   folder: string
@@ -64,9 +64,9 @@ export interface AutomatApi {
   /** Export: speichert `data` über einen Speichern-Dialog. Liefert den Pfad oder `null`. */
   saveExport(defaultName: string, filter: FileFilter, data: Uint8Array): Promise<string | null>
   /**
-   * Export einer Bildfolge mit `count` Bildern: fragt nach einem Ordner und liefert ihn mit der
-   * Nummer des Auftrags oder `null`. Die Bilder schreibt danach `writeExportSequence` einzeln als
-   * `baseName-01.ext` …
+   * Export einer Bildfolge mit `count` Bildern: fragt nach einem Ordner, legt darin einen neuen
+   * Ordner `baseName` (bzw. `baseName (2)` …) an und liefert ihn mit der Nummer des Auftrags oder
+   * `null`. Die Bilder schreibt danach `writeExportSequence` einzeln als `baseName-01.ext` …
    */
   beginExportSequence(
     baseName: string,
