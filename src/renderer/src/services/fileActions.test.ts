@@ -278,6 +278,28 @@ describe('Öffnen während weiterer Änderungen', () => {
     expect(store().dirty).toBe(true)
   })
 
+  it('übernimmt ein beim Lesen angefangenes Feld und fragt dann nach', async () => {
+    const id = store().addState(0, 0)
+    store().markSaved(null)
+    const pending = openFile()
+    await vi.waitFor(() => expect(finish).not.toBeNull())
+    // Ein Feld wie CommitInput: übernimmt erst beim Fokusverlust
+    class Input {
+      blur(): void {
+        store().updateState(id, { label: 'entwurf' })
+      }
+    }
+    vi.stubGlobal('HTMLElement', Input)
+    vi.stubGlobal('HTMLInputElement', Input)
+    vi.stubGlobal('document', { activeElement: new Input() })
+    await answerWith(otherFile())
+    await vi.waitFor(() => expect(dialog().request).not.toBeNull())
+    dialog().answer(2)
+    await pending
+    expect(store().document.graph.states[0].label).toBe('entwurf')
+    expect(store().dirty).toBe(true)
+  })
+
   it('verwirft die Datei, wenn inzwischen ein anderes Dokument offen ist', async () => {
     const pending = openFile()
     await vi.waitFor(() => expect(finish).not.toBeNull())

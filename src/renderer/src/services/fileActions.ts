@@ -111,9 +111,10 @@ async function openFrom(read: () => Promise<OpenFileResult | null>): Promise<voi
     // AutoEdit-Dateien (XML) werden umgewandelt – egal ob über Import, Öffnen oder Ziehen
     imported = looksLikeXml(content)
     const document = imported ? importAutoEdit(content) : deserializeDocument(content)
-    const now = useEditorStore.getState()
-    if (now.session !== session) return
-    if (now.document !== before && !(await confirmDiscard())) return
+    if (useEditorStore.getState().session !== session) return
+    // Ein Feld, das erst beim Fokusverlust übernimmt, kann noch einen Entwurf halten
+    commitActiveInput()
+    if (useEditorStore.getState().document !== before && !(await confirmDiscard())) return
     if (useEditorStore.getState().session !== session) return
     // Im Browser ist das nur der Dateiname (ohne Ordner) – reicht für den Anzeigenamen.
     // Ohne Pfad (Electron kennt ihn nicht) fragt „Speichern“ wie bei einem neuen Automaten.
