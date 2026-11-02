@@ -318,8 +318,9 @@ export class RegexSyntaxError extends Error {
  * Schreibweise von `escapeSymbol`: `\(` ist das Symbol „(“, allgemein `\x` das Zeichen x.
  */
 export function parseRegex(input: string, alphabet: string[] = []): Regex {
+  // ε ist nie ein Symbol – auch nicht, wenn eine importierte Datei es in Σ hat
   const spellings = alphabet
-    .filter((s) => s !== '')
+    .filter((s) => s !== '' && s !== EPSILON)
     .map((s) => ({ symbol: s, text: escapeSymbol(s) }))
     .sort((a, b) => b.text.length - a.text.length)
   let pos = 0

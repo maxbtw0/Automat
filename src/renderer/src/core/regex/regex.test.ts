@@ -156,6 +156,11 @@ describe('Symbole mit Operator-Zeichen', () => {
     expect(() => parseRegex('a\\ε')).toThrow('ε ist kein Symbol')
   })
 
+  it('\\ε bleibt ein Fehler, auch wenn ε (aus einer Datei) in Σ liegt', () => {
+    expect(() => parseRegex('\\ε', ['ε'])).toThrow('ε ist kein Symbol')
+    expect(parseRegex('ε', ['ε'])).toEqual(parseRegex('ε'))
+  })
+
   it('Leerzeichen, Komma und Semikolon sind keine Symbole – auch nicht maskiert', () => {
     for (const input of ['\\ ', 'a\\\t', ',', 'a;b', '\\,']) {
       expect(() => parseRegex(input), input).toThrow('keine Symbole')

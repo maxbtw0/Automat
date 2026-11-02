@@ -2,6 +2,7 @@ import { alphabetOverlap, separatorProblem } from '@shared/alphabetRules'
 import {
   EPSILON,
   edgeSymbols,
+  normalizeSymbol,
   type AutomatonDocument,
   type EditorGraph,
   type StateId,
@@ -55,9 +56,10 @@ export function checkReferences(graph: EditorGraph): ValidationIssue[] {
 }
 
 /**
- * Kein Zeichen einzeln und zugleich in einem Mehrzeichen-Symbol (`overlapProblem`) und kein
- * Trennzeichen im Symbol (`separatorProblem`) – in Σ und, falls vorhanden, im Stack-, Band- und
- * Ausgabealphabet. Der Alphabeteditor lässt das nicht zu, Dateien und Ausdrücke kommen von außen.
+ * Kein Zeichen einzeln und zugleich in einem Mehrzeichen-Symbol (`overlapProblem`), kein
+ * Trennzeichen im Symbol (`separatorProblem`) und kein ε (auch nicht „eps“) – in Σ und, falls
+ * vorhanden, im Stack-, Band- und Ausgabealphabet. Der Alphabeteditor lässt das nicht zu,
+ * Dateien und Ausdrücke kommen von außen.
  */
 export function checkAlphabets(document: AutomatonDocument): ValidationIssue[] {
   const alphabets = [
@@ -72,6 +74,7 @@ export function checkAlphabets(document: AutomatonDocument): ValidationIssue[] {
     for (const symbol of alphabet) {
       const problem = separatorProblem(symbol)
       if (problem) messages.add(problem)
+      if (normalizeSymbol(symbol) === EPSILON) messages.add(`„${symbol}“ ist ε, kein Symbol`)
     }
     const problem = alphabetOverlap(alphabet)
     if (problem) messages.add(problem)
