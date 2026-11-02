@@ -18,6 +18,7 @@ import {
   labelKey,
   labelSymbols,
   type AlphabetKind,
+  type StackAcceptance,
   type StackSettings,
   type TapeSettings,
   type TransitionLabel,
@@ -210,7 +211,8 @@ interface EditorState {
   moveStatesLive(positions: ReadonlyMap<StateId, Point>): void
   updateState(id: StateId, patch: Partial<Omit<StateNode, 'id'>>): void
   setStartState(id: StateId): void
-  toggleFinal(id: StateId): void
+  /** Kellerautomat: `acceptance` stellt im selben Undo-Schritt die Akzeptanz um. */
+  toggleFinal(id: StateId, acceptance?: StackAcceptance): void
   deleteState(id: StateId): void
 
   // --- Übergänge ---
@@ -645,12 +647,13 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           states: doc.graph.states.map((s) => ({ ...s, isStart: s.id === id }))
         })
       ),
-    toggleFinal: (id) =>
-      commit((doc) =>
-        withGraph(doc, {
+    toggleFinal: (id, acceptance) =>
+      commit((doc) => {
+        const next = withGraph(doc, {
           states: doc.graph.states.map((s) => (s.id === id ? { ...s, isFinal: !s.isFinal } : s))
         })
-      ),
+        return acceptance ? { ...next, stack: { ...stackSettings(doc), acceptance } } : next
+      }),
     deleteState: (id) => {
       commit((doc) =>
         withGraph(doc, {

@@ -36,6 +36,7 @@ import {
 } from '@/utils/geometry'
 import { isPanKey, panModifierHeld } from '@shared/navigationSettings'
 import { ContextMenu, type ContextMenuEntry } from '@/components/common/ContextMenu'
+import { toggleFinalState } from '@/services/stateActions'
 import {
   formatLabelsInline,
   labelWordAlphabet,
@@ -546,7 +547,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
                 {
                   label: 'Endzustand',
                   checked: state.isFinal,
-                  onSelect: () => store.toggleFinal(state.id)
+                  onSelect: () => void toggleFinalState(state.id)
                 }
               ]),
           'separator',

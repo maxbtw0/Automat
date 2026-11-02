@@ -41,6 +41,7 @@ import {
   type TransitionEdge,
   type TransitionLabel
 } from '@/model/graph'
+import { toggleFinalState } from '@/services/stateActions'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 
@@ -71,7 +72,7 @@ export function PropertiesPanel() {
 }
 
 function StateProperties({ state, doc }: { state: StateNode; doc: AutomatonDocument }) {
-  const { updateState, setStartState, toggleFinal, deleteState, select, setStatus } =
+  const { updateState, setStartState, deleteState, select, setStatus } =
     useEditorStore.getState()
   const outgoing = doc.graph.transitions.filter((t) => t.from === state.id)
   const gamma = labelWordAlphabet(doc)
@@ -116,7 +117,11 @@ function StateProperties({ state, doc }: { state: StateNode; doc: AutomatonDocum
       </label>
       {!usesOutput(doc.type) && (
         <label className="checkbox">
-          <input type="checkbox" checked={state.isFinal} onChange={() => toggleFinal(state.id)} />
+          <input
+            type="checkbox"
+            checked={state.isFinal}
+            onChange={() => void toggleFinalState(state.id)}
+          />
           Endzustand
         </label>
       )}
