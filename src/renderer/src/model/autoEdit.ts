@@ -172,7 +172,10 @@ function readStack(root: XmlElement): StackSettings {
 function readTape(root: XmlElement, alphabet: string[]): TapeSettings {
   const tape = items(root, 'TAPEALPHABET')
   const blank = valueOf(root, 'TAPEINITIALCHAR')
-  if (blank === undefined || blank === '') return createTapeSettings(alphabet)
+  // Ohne Blank: das deklarierte Γ behalten und ein freies Blank dazunehmen
+  if (blank === undefined || blank === '') {
+    return createTapeSettings([...new Set([...tape, ...alphabet])])
+  }
   const symbols = [...new Set([...tape, ...alphabet])].filter((s) => s !== blank)
   return { alphabet: [...symbols, blank], blank }
 }

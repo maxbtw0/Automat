@@ -262,3 +262,12 @@ describe('looksLikeXml', () => {
     expect(looksLikeXml('{"format":"automat"}')).toBe(false)
   })
 })
+
+  it('behält ohne TAPEINITIALCHAR das deklarierte Γ und wählt ein freies Blank', () => {
+    const doc = importAutoEdit(atoccAnBnCn.replace(/<TAPEINITIALCHAR[^>]*\/>/, ''))
+    const tape = doc.tape!
+    expect(tape.alphabet).toEqual(expect.arrayContaining(['X', '-', '$', 'a', 'b', 'c']))
+    expect(tape.alphabet.at(-1)).toBe(tape.blank)
+    expect(['X', '-', '$', 'a', 'b', 'c']).not.toContain(tape.blank)
+    expect(createAutomaton(doc).validate()).toEqual([])
+  })
