@@ -97,7 +97,7 @@ export function checkSymbols(
         if (!allowEpsilon) {
           issues.push({
             severity: 'error',
-            message: 'ε-Übergang ist nur beim NEA erlaubt',
+            message: 'Dieser Automatentyp erlaubt keine ε-Übergänge',
             transitionIds: [t.id]
           })
         }

@@ -172,7 +172,7 @@ function TransitionList() {
     const symbol = normalizeSymbol(input)
     if (!symbol) return false
     if (symbol === EPSILON && !allowsEpsilon) {
-      setError('ε gibt es nur beim NEA')
+      setError('Dieser Automatentyp erlaubt kein ε')
       return false
     }
     if (symbol !== EPSILON && !alphabet.includes(symbol)) {

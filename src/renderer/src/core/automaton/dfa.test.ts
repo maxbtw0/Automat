@@ -67,7 +67,7 @@ describe('DFA', () => {
       ['q0', `a,${EPSILON}`, 'q0']
     ])
     expect(new DFA(doc).validate()).toContainEqual(
-      expect.objectContaining({ severity: 'error', message: 'ε-Übergang ist nur beim NEA erlaubt' })
+      expect.objectContaining({ severity: 'error', message: 'Dieser Automatentyp erlaubt keine ε-Übergänge' })
     )
   })
 

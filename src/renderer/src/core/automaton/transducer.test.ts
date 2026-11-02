@@ -101,7 +101,7 @@ describe('Mealy-Automat', () => {
       message: '„2“ nicht im Ausgabealphabet',
       transitionIds: ['t0']
     })
-    expect(issues.map((i) => i.message)).toContain('ε-Übergang ist nur beim NEA erlaubt')
+    expect(issues.map((i) => i.message)).toContain('Dieser Automatentyp erlaubt keine ε-Übergänge')
     expect(issues.map((i) => i.message)).toContain('Unvollständig: q ohne „b“')
     // Keine Endzustände nötig
     expect(issues.map((i) => i.message)).not.toContain('Kein Endzustand')
