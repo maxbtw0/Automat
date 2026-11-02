@@ -48,6 +48,12 @@ export interface OpenFileResult {
   data: Uint8Array
 }
 
+/** Eine begonnene Bildfolge: Nummer des Auftrags und gewählter Ordner */
+export interface ExportSequence {
+  id: number
+  folder: string
+}
+
 /** Die API, die der Preload als `window.api` bereitstellt. */
 export interface AutomatApi {
   openFile(kind?: OpenFileKind): Promise<OpenFileResult | null>
@@ -58,12 +64,20 @@ export interface AutomatApi {
   /** Export: speichert `data` über einen Speichern-Dialog. Liefert den Pfad oder `null`. */
   saveExport(defaultName: string, filter: FileFilter, data: Uint8Array): Promise<string | null>
   /**
-   * Export einer Bildfolge mit `count` Bildern: fragt nach einem Ordner und liefert ihn oder
-   * `null`. Die Bilder schreibt danach `writeExportSequence` einzeln als `baseName-01.ext` …
+   * Export einer Bildfolge mit `count` Bildern: fragt nach einem Ordner und liefert ihn mit der
+   * Nummer des Auftrags oder `null`. Die Bilder schreibt danach `writeExportSequence` einzeln als
+   * `baseName-01.ext` …
    */
-  beginExportSequence(baseName: string, extension: string, count: number): Promise<string | null>
-  /** Schreibt Bild Nr. `index` (ab 0) der zuletzt begonnenen Bildfolge. */
-  writeExportSequence(index: number, data: Uint8Array): Promise<void>
+  beginExportSequence(
+    baseName: string,
+    extension: string,
+    count: number
+  ): Promise<ExportSequence | null>
+  /**
+   * Schreibt Bild Nr. `index` (ab 0) der Bildfolge `id`. Wirft, wenn inzwischen eine andere
+   * Bildfolge begonnen wurde.
+   */
+  writeExportSequence(id: number, index: number, data: Uint8Array): Promise<void>
   /** Export als PDF: `html` wird unsichtbar gerendert und gedruckt. Liefert den Pfad oder `null`. */
   exportPdf(defaultName: string, html: string): Promise<string | null>
   /** Meldet ungespeicherte Änderungen – nur dann fragt das Fenster beim Schließen nach. */

@@ -201,11 +201,15 @@ async function askSavePath(
   return result.canceled || !result.filePath ? null : result.filePath
 }
 
-/** Zuletzt begonnene Bildfolge pro Fenster (`webContents.id`) */
+/**
+ * Zuletzt begonnene Bildfolge pro Fenster (`webContents.id`). `id` bindet die Schreibaufrufe an
+ * ihren Auftrag – Nachzügler eines älteren Exports landen nie im Ordner eines neuen.
+ */
 const sequences = new Map<
   number,
-  { folder: string; baseName: string; extension: string; count: number }
+  { id: number; folder: string; baseName: string; extension: string; count: number }
 >()
+let lastSequenceId = 0
 
 function registerIpcHandlers(): void {
   ipcMain.handle(
@@ -260,21 +264,27 @@ function registerIpcHandlers(): void {
       if (result.canceled || result.filePaths.length === 0) return null
       const folder = result.filePaths[0]
       if (!/^[a-z]+$/.test(extension)) throw new Error('Ungültige Endung')
-      sequences.set(event.sender.id, { folder, baseName: basename(baseName), extension, count })
-      return folder
+      const id = ++lastSequenceId
+      sequences.set(event.sender.id, { id, folder, baseName: basename(baseName), extension, count })
+      return { id, folder }
     }
   )
 
   // Ein Bild nach dem anderen – der Renderer muss nie alle gleichzeitig im Speicher halten.
   // Den Pfad baut der Hauptprozess selbst: Der Renderer wählt nur die Nummer.
-  ipcMain.handle(IpcChannels.exportSequenceWrite, async (event, index: number, data: Uint8Array) => {
-    const sequence = sequences.get(event.sender.id)
-    if (!sequence) throw new Error('Keine Bildfolge begonnen')
-    const { folder, baseName, extension, count } = sequence
-    if (!Number.isInteger(index) || index < 0 || index >= count) throw new Error('Ungültiges Bild')
-    const number = String(index + 1).padStart(Math.max(2, String(count).length), '0')
-    await safeWriteFile(join(folder, `${baseName}-${number}.${extension}`), data)
-  })
+  ipcMain.handle(
+    IpcChannels.exportSequenceWrite,
+    async (event, id: number, index: number, data: Uint8Array) => {
+      const sequence = sequences.get(event.sender.id)
+      if (!sequence || sequence.id !== id) throw new Error('Bildfolge nicht mehr aktiv')
+      const { folder, baseName, extension, count } = sequence
+      if (!Number.isInteger(index) || index < 0 || index >= count) {
+        throw new Error('Ungültiges Bild')
+      }
+      const number = String(index + 1).padStart(Math.max(2, String(count).length), '0')
+      await safeWriteFile(join(folder, `${baseName}-${number}.${extension}`), data)
+    }
+  )
 
   ipcMain.handle(IpcChannels.exportPdf, async (event, defaultName: string, html: string) => {
     const filter = { name: 'PDF', extensions: ['pdf'] }

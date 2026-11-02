@@ -133,9 +133,13 @@ export function ExportDialog() {
     }
   }, [open, content, format, theme, description, document, simulationWord])
 
-  const pages = plan?.ok ? plan.value.pages : []
+  const pageCount = plan?.ok ? plan.value.pageCount : 0
   useEffect(() => setPage(0), [content, format, description])
-  const shown = pages[Math.min(page, pages.length - 1)]
+  // Nur die angezeigte Seite bauen – eine Bildfolge kann sehr viele haben
+  const shown = useMemo(
+    () => (plan?.ok && pageCount > 0 ? plan.value.page(Math.min(page, pageCount - 1)) : null),
+    [plan, page]
+  )
 
   if (!open || !content || !format) return null
 
@@ -234,7 +238,7 @@ export function ExportDialog() {
               plan && !plan.ok && <p className="export-error">{plan.error}</p>
             )}
           </div>
-          {pages.length > 1 && (
+          {pageCount > 1 && (
             <div className="export-pager">
               <button
                 className="btn is-ghost is-icon"
@@ -245,11 +249,11 @@ export function ExportDialog() {
                 <Icon name="stepBack" />
               </button>
               <span>
-                {page + 1} / {pages.length}
+                {page + 1} / {pageCount}
               </span>
               <button
                 className="btn is-ghost is-icon"
-                disabled={page >= pages.length - 1}
+                disabled={page >= pageCount - 1}
                 onClick={() => setPage(page + 1)}
                 aria-label="Nächste Seite"
               >

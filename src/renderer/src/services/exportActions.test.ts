@@ -6,7 +6,14 @@ import { buildDocument } from '@/core/automaton/testing'
 import { A4 } from '@/export/svg'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
-import { FORMATS, defaultExportArea, planExport, runExport } from './exportActions'
+import {
+  FORMATS,
+  allPages,
+  defaultExportArea,
+  forEachLimited,
+  planExport,
+  runExport
+} from './exportActions'
 
 /** Rastern braucht einen echten Browser – hier zählt nur, wie viele gleichzeitig laufen */
 const raster = vi.hoisted(() => ({ running: 0, most: 0 }))
@@ -19,6 +26,21 @@ vi.mock('@/export/render', async (original) => ({
     return new Uint8Array([1])
   }
 }))
+
+/** Wie oft ein Graph gebaut wird – die Vorschau einer Bildfolge soll nur eine Seite bauen */
+const built = vi.hoisted(() => ({ graphs: 0 }))
+vi.mock('@/export/svg', async (original) => {
+  const svg = await original<typeof import('@/export/svg')>()
+  return {
+    ...svg,
+    graphSvg: (...args: Parameters<typeof svg.graphSvg>) => {
+      built.graphs++
+      return svg.graphSvg(...args)
+    }
+  }
+})
+
+const pagesOf = (...args: Parameters<typeof planExport>) => allPages(planExport(...args))
 
 /** Gerade Anzahl a */
 const evenAs = buildDocument('DFA', ['a', 'b'], { start: 'q0', finals: ['q0'] }, [
@@ -35,33 +57,45 @@ beforeEach(() => {
 
 describe('Simulation exportieren', () => {
   it('geht auch ohne gestartete Simulation – mit dem kompletten Lauf', () => {
-    const { table, pages } = planExport('simulationTable', 'csv', 'light')
+    const plan = planExport('simulationTable', 'csv', 'light')
+    const { table } = plan
+    const pages = allPages(plan)
     expect(table?.rows.map((r) => r[2])).toEqual(['q0', 'q1', 'q1', 'q0'])
     expect(table?.rowTones?.at(-1)).toBe('accepted')
     expect(pages).toHaveLength(1)
   })
 
   it('Bildfolge: ein Bild pro Schritt – als PDF A4 quer, als PNG zugeschnitten', () => {
-    const pdf = planExport('simulationGraph', 'pdf', 'dark').pages
+    const pdf = pagesOf('simulationGraph', 'pdf', 'dark')
     expect(pdf).toHaveLength(4)
     expect(pdf.every((p) => p.width === A4.landscape.width)).toBe(true)
-    const png = planExport('simulationGraph', 'png', 'dark').pages
+    const png = pagesOf('simulationGraph', 'png', 'dark')
     expect(png).toHaveLength(4)
     expect(png[0].width).toBeLessThan(A4.landscape.width)
   })
 
+  it('Bildfolge: baut eine Seite erst, wenn sie gebraucht wird', () => {
+    useScreenStore.setState({ simulationWord: 'ab'.repeat(50) })
+    built.graphs = 0
+    const plan = planExport('simulationGraph', 'png', 'light')
+    expect(plan.pageCount).toBe(101)
+    expect(built.graphs).toBe(0)
+    expect(plan.page(100).svg).toContain('Schritt 100')
+    expect(built.graphs).toBe(1)
+  })
+
   it('Bildfolge mit Beschreibung: ein Satz pro Schritt, am Ende das Ergebnis', () => {
-    const plain = planExport('simulationGraph', 'pdf', 'light').pages
+    const plain = pagesOf('simulationGraph', 'pdf', 'light')
     expect(plain[1].svg).not.toContain('gelesen und')
-    const { pages } = planExport('simulationGraph', 'pdf', 'light', { description: true })
+    const pages = pagesOf('simulationGraph', 'pdf', 'light', { description: true })
     expect(pages[1].svg).toContain('Es wird „a“ gelesen und in Zustand q1 gewechselt.')
     expect(pages[3].svg).toContain('Das Wort „aba“ wird akzeptiert.')
   })
 
   it('Graph mit Tabelle: als PDF Graph quer, Tabelle hoch – als PNG ein Bild', () => {
-    const { pages } = planExport('simulationGraphTable', 'pdf', 'light')
+    const pages = pagesOf('simulationGraphTable', 'pdf', 'light')
     expect(pages.map((p) => p.width)).toEqual([A4.landscape.width, A4.portrait.width])
-    expect(planExport('simulationGraphTable', 'png', 'light').pages).toHaveLength(1)
+    expect(pagesOf('simulationGraphTable', 'png', 'light')).toHaveLength(1)
   })
 
   it('Graph mit Tabelle schafft auch sehr lange Läufe', () => {
@@ -70,7 +104,7 @@ describe('Simulation exportieren', () => {
     useScreenStore.setState({ simulationWord: '' })
     setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: 150_000 })
     try {
-      expect(planExport('simulationGraphTable', 'png', 'light').pages).toHaveLength(1)
+      expect(pagesOf('simulationGraphTable', 'png', 'light')).toHaveLength(1)
     } finally {
       setSimulationLimits(DEFAULT_SIMULATION)
     }
@@ -119,9 +153,9 @@ describe('Bildfolge exportieren', () => {
   const api = {
     beginExportSequence: vi.fn<AutomatApi['beginExportSequence']>(async () => {
       events.push('Ordner')
-      return '/bilder'
+      return { id: 1, folder: '/bilder' }
     }),
-    writeExportSequence: vi.fn<AutomatApi['writeExportSequence']>(async (index) => {
+    writeExportSequence: vi.fn<AutomatApi['writeExportSequence']>(async (_id, index) => {
       events.push(`Bild ${index}`)
     })
   }
@@ -141,6 +175,7 @@ describe('Bildfolge exportieren', () => {
     expect(events).toHaveLength(22)
     expect(new Set(events.slice(1)).size).toBe(21)
     expect(raster.most).toBe(2)
+    expect(api.writeExportSequence).toHaveBeenCalledWith(1, 0, expect.any(Uint8Array))
   })
 
   it('rastert nichts, wenn die Ordnerwahl abgebrochen wird', async () => {
@@ -152,27 +187,29 @@ describe('Bildfolge exportieren', () => {
 
 describe('Seitenformat', () => {
   it('PDF: Tabellen A4 hoch (lange auf mehrere Seiten), Graph A4 quer', () => {
-    expect(planExport('transitionTable', 'pdf', 'light').pages[0]).toMatchObject(A4.portrait)
-    expect(planExport('graph', 'pdf', 'light').pages[0]).toMatchObject(A4.landscape)
+    expect(pagesOf('transitionTable', 'pdf', 'light')[0]).toMatchObject(A4.portrait)
+    expect(pagesOf('graph', 'pdf', 'light')[0]).toMatchObject(A4.landscape)
     useScreenStore.setState({ simulationWord: 'ab'.repeat(20) })
-    const pages = planExport('simulationTable', 'pdf', 'light').pages
+    const pages = pagesOf('simulationTable', 'pdf', 'light')
     expect(pages).toHaveLength(2)
     expect(pages.every((p) => p.height === A4.portrait.height)).toBe(true)
   })
 
   it('PNG/JPG/CSV: zugeschnitten, lange Tabelle als ein Bild', () => {
     useScreenStore.setState({ simulationWord: 'ab'.repeat(20) })
-    const [table] = planExport('simulationTable', 'jpg', 'light').pages
-    expect(planExport('simulationTable', 'jpg', 'light').pages).toHaveLength(1)
+    const [table] = pagesOf('simulationTable', 'jpg', 'light')
+    expect(pagesOf('simulationTable', 'jpg', 'light')).toHaveLength(1)
     expect(table.height).toBeGreaterThan(A4.portrait.height)
-    expect(planExport('graph', 'png', 'light').pages[0].width).toBeLessThan(A4.landscape.width)
-    expect(planExport('simulationTable', 'csv', 'light').pages).toHaveLength(1)
+    expect(pagesOf('graph', 'png', 'light')[0].width).toBeLessThan(A4.landscape.width)
+    expect(pagesOf('simulationTable', 'csv', 'light')).toHaveLength(1)
   })
 })
 
 describe('Alles exportieren', () => {
   it('PDF: Graph quer, dahinter alle Tabellen nebeneinander auf einer Querseite', () => {
-    const { table, pages } = planExport('all', 'pdf', 'light')
+    const plan = planExport('all', 'pdf', 'light')
+    const { table } = plan
+    const pages = allPages(plan)
     expect(table).toBeNull()
     expect(pages).toHaveLength(2)
     expect(pages.every((p) => p.width === A4.landscape.width)).toBe(true)
@@ -184,7 +221,7 @@ describe('Alles exportieren', () => {
 
   it('PDF: lange Tabellen laufen in weiteren Spalten und Seiten weiter', () => {
     useScreenStore.setState({ simulationWord: 'ab'.repeat(60) })
-    const { pages } = planExport('all', 'pdf', 'light')
+    const pages = pagesOf('all', 'pdf', 'light')
     expect(pages.length).toBeGreaterThan(2)
     expect(pages.every((p) => p.height === A4.landscape.height)).toBe(true)
     const sheets = pages.slice(1).map((p) => p.svg).join('')
@@ -193,7 +230,7 @@ describe('Alles exportieren', () => {
   })
 
   it('PNG: ein Bild mit Graph und allen Tabellen, kein CSV', () => {
-    const { pages } = planExport('all', 'png', 'dark')
+    const pages = pagesOf('all', 'png', 'dark')
     expect(pages).toHaveLength(1)
     expect(pages[0].svg).toContain('Übergangstabelle')
     expect(FORMATS.all).not.toContain('csv')
@@ -205,5 +242,27 @@ describe('defaultExportArea', () => {
     expect(defaultExportArea('transitionTable')).toBe('transitionTable')
     expect(defaultExportArea('simulation')).toBe('simulation')
     expect(defaultExportArea('regex')).toBe('graph')
+  })
+})
+
+describe('forEachLimited', () => {
+  it('vergibt nach einem Fehler nichts mehr und meldet ihn erst, wenn alle fertig sind', async () => {
+    const started: number[] = []
+    let finishSlow = (): void => undefined
+    let slowDone = false
+    const run = forEachLimited(10, 2, async (i) => {
+      started.push(i)
+      if (i === 0) throw new Error('kaputt')
+      await new Promise<void>((resolve) => (finishSlow = resolve))
+      slowDone = true
+    })
+    let settled = false
+    void run.catch(() => undefined).finally(() => (settled = true))
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(settled).toBe(false)
+    finishSlow()
+    await expect(run).rejects.toThrow('kaputt')
+    expect(slowDone).toBe(true)
+    expect(started).toEqual([0, 1])
   })
 })

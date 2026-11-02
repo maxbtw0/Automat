@@ -136,11 +136,12 @@ export interface ExportOptions {
   description?: boolean
 }
 
-/** Das, was exportiert wird: die Seiten und – bei Tabellen-Inhalten – die Tabelle (für CSV). */
-interface Prepared {
-  table: ExportTable | null
-  pages: SvgImage[]
-}
+/** Plan aus Seiten, die schon fertig sind */
+const ready = (table: ExportTable | null, pages: SvgImage[]): ExportPlan => ({
+  table,
+  pageCount: pages.length,
+  page: (index) => pages[index]
+})
 
 /**
  * Wie Tabellen und Graphen auf die Seiten kommen. PDF: A4-Seiten – Tabellen hoch (lange auf
@@ -228,16 +229,12 @@ function prepare(
   name: string,
   layout: Layout,
   { description = false }: ExportOptions
-): Prepared {
+): ExportPlan {
   // Tabellen tragen den Namen des Automaten unter dem Titel
   const named = (table: ExportTable): ExportTable => ({ ...table, subtitle: name })
-  const tableOnly = (table: ExportTable): Prepared => ({
-    table: named(table),
-    pages: layout.table(named(table))
-  })
-  if (content === 'graph') {
-    return { table: null, pages: [layout.graph(graphSvg(document, null, { palette }))] }
-  }
+  const tableOnly = (table: ExportTable): ExportPlan =>
+    ready(named(table), layout.table(named(table)))
+  if (content === 'graph') return ready(null, [layout.graph(graphSvg(document, null, { palette }))])
   if (content === 'alphabet') return tableOnly(alphabetTable(document))
   if (content === 'transitionTable') {
     const sorted = useScreenStore.getState().transitionTableSorted
@@ -255,14 +252,14 @@ function prepare(
     const graph = layout.graph(graphSvg(document, null, { palette }))
     if (format !== 'pdf') {
       const row = rowSvg(tables.map((t) => tableSvg(t, palette)), 24)
-      return { table: null, pages: [columnSvg([graph, row], 24)] }
+      return ready(null, [columnSvg([graph, row], 24)])
     }
     const columns = tables.flatMap((t) => sheetColumns(t).map((c) => tableSvg(c, palette)))
     const sheets = sideBySidePages(columns, 'landscape', {
       scale: SHEET_SCALE,
       minScale: SHEET_MIN_SCALE
     })
-    return { table: null, pages: [graph, ...sheets] }
+    return ready(null, [graph, ...sheets])
   }
   const last = snapshot.steps.length - 1
   const outcomeAt = (i: number): 'accepted' | 'rejected' | undefined =>
@@ -330,7 +327,8 @@ function prepare(
   }
 
   if (content === 'simulationGraph') {
-    const pages = snapshot.steps.map((step, i) => {
+    const page = (i: number): SvgImage => {
+      const step = snapshot.steps[i]
       const highlight = highlightOf(step, outcomeAt(i))
       const graph = withStack(
         graphSvg(document, highlight, { palette, idPrefix: `s${i}` }),
@@ -342,8 +340,8 @@ function prepare(
       const parts = [captionSvg(stepCaption(step), width, palette), graph]
       if (description) parts.push(paragraphSvg(describe(i), width, palette))
       return layout.graph(columnSvg(parts))
-    })
-    return { table: null, pages }
+    }
+    return { table: null, pageCount: snapshot.steps.length, page }
   }
   // Graph mit Tabelle: Graph (und Stack/Band) in der Endkonfiguration + ganze Tabelle –
   // als PDF Graph quer, dahinter die Tabelle hoch; als Bild beides untereinander
@@ -351,8 +349,8 @@ function prepare(
   const highlight = highlightOf(step, outcomeAt(snapshot.index))
   const graph = withStack(graphSvg(document, highlight, { palette }), step, snapshot.index)
   const table = named(simulationTable(document, snapshot, { markCurrent: true }))
-  if (format === 'pdf') return { table: null, pages: [layout.graph(graph), ...layout.table(table)] }
-  return { table: null, pages: [columnSvg([graph, tableSvg(table, palette)], 16)] }
+  if (format === 'pdf') return ready(null, [layout.graph(graph), ...layout.table(table)])
+  return ready(null, [columnSvg([graph, tableSvg(table, palette)], 16)])
 }
 
 /**
@@ -368,11 +366,26 @@ function sheetColumns(table: ExportTable): ExportTable[] {
   )
 }
 
+/**
+ * Das, was exportiert wird: die Seiten und – bei Tabellen-Inhalten – die Tabelle (für CSV).
+ * Bildfolgen bauen ihre Seiten erst bei `page(i)`: ein Bild pro Schritt, und jedes Bild kann mit
+ * der Wortlänge wachsen – alle vorab zu bauen wäre quadratisch.
+ */
 export interface ExportPlan {
   /** Die Tabelle (für CSV), falls der Inhalt eine Tabelle ist */
   table: ExportTable | null
-  /** Die Bilder bzw. PDF-Seiten, genau so, wie sie exportiert werden – auch für die Vorschau */
-  pages: SvgImage[]
+  /** Anzahl der Bilder bzw. PDF-Seiten */
+  pageCount: number
+  /**
+   * Bild bzw. PDF-Seite Nr. `index`, genau so, wie sie exportiert wird – auch für die Vorschau.
+   * Bei Bildfolgen erst beim Aufruf gebaut, nicht gemerkt.
+   */
+  page(index: number): SvgImage
+}
+
+/** Alle Seiten auf einmal – nur, wo sie ohnehin zusammen gebraucht werden (PDF) */
+export function allPages(plan: ExportPlan): SvgImage[] {
+  return Array.from({ length: plan.pageCount }, (_, i) => plan.page(i))
 }
 
 /**
@@ -429,7 +442,7 @@ export async function runExport(
   plan: ExportPlan = planExport(content, format, theme, options)
 ): Promise<string | null> {
   const { filePath } = useEditorStore.getState()
-  const { table, pages } = plan
+  const { table, pageCount } = plan
   const base = `${displayName(filePath)}-${FILE_SUFFIX[content]}`
 
   if (format === 'csv') {
@@ -438,44 +451,59 @@ export async function runExport(
   }
 
   if (format === 'pdf') {
-    const html = pdfHtml(pages)
+    const html = pdfHtml(allPages(plan))
     if (window.api) return window.api.exportPdf(`${base}.pdf`, html)
     printInBrowser(html)
     return `${base}.pdf`
   }
 
   const type = format === 'jpg' ? 'jpeg' : 'png'
-  if (pages.length === 1) return save(`${base}.${format}`, format, await rasterize(pages[0], type))
-  // Erst den Ordner wählen, dann Bild für Bild rastern und sofort schreiben
+  if (pageCount === 1) {
+    return save(`${base}.${format}`, format, await rasterize(plan.page(0), type))
+  }
+  // Erst den Ordner wählen, dann Bild für Bild bauen, rastern und sofort schreiben
   const api = window.api
   if (api) {
-    const folder = await api.beginExportSequence(base, format, pages.length)
-    if (!folder) return null
-    await forEachLimited(pages, RASTER_PARALLEL, async (image, i) =>
-      api.writeExportSequence(i, await rasterize(image, type))
+    const sequence = await api.beginExportSequence(base, format, pageCount)
+    if (!sequence) return null
+    await forEachLimited(pageCount, RASTER_PARALLEL, async (i) =>
+      api.writeExportSequence(sequence.id, i, await rasterize(plan.page(i), type))
     )
-    return folder
+    return sequence.folder
   }
-  await forEachLimited(pages, RASTER_PARALLEL, async (image, i) =>
-    download(`${base}-${String(i + 1).padStart(2, '0')}.${format}`, await rasterize(image, type))
-  )
+  await forEachLimited(pageCount, RASTER_PARALLEL, async (i) => {
+    const data = await rasterize(plan.page(i), type)
+    download(`${base}-${String(i + 1).padStart(2, '0')}.${format}`, data)
+  })
   return base
 }
 
-/** Führt `task` für alle Einträge aus, höchstens `limit` gleichzeitig. */
-async function forEachLimited<T>(
-  items: T[],
+/**
+ * Führt `task` für 0 … count − 1 aus, höchstens `limit` gleichzeitig. Nach dem ersten Fehler
+ * beginnt keine Aufgabe mehr; abgelehnt wird erst, wenn auch die laufenden fertig sind – sonst
+ * schriebe ein Nachzügler noch, während schon der nächste Export läuft.
+ */
+export async function forEachLimited(
+  count: number,
   limit: number,
-  task: (item: T, index: number) => Promise<void>
+  task: (index: number) => Promise<void>
 ): Promise<void> {
   let next = 0
+  let failed = false
   const worker = async (): Promise<void> => {
-    while (next < items.length) {
+    while (!failed && next < count) {
       const i = next++
-      await task(items[i], i)
+      try {
+        await task(i)
+      } catch (err) {
+        failed = true
+        throw err
+      }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  const results = await Promise.allSettled(Array.from({ length: Math.min(limit, count) }, worker))
+  const failure = results.find((r) => r.status === 'rejected')
+  if (failure) throw failure.reason
 }
 
 /** Browser-Modus (Entwicklung): Druckdialog mit „Als PDF speichern“. */
