@@ -5,6 +5,7 @@ import { setSimulationLimits } from '@/core/automaton/limits'
 import { buildDocument } from '@/core/automaton/testing'
 import { TuringSimulator } from '@/core/automaton/tmSimulator'
 import type { SimulationStep } from '@/core/automaton/types'
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE } from '@/export/render'
 import { A4 } from '@/export/svg'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
@@ -311,5 +312,26 @@ describe('Bandausschnitt der Turingmaschine', () => {
       expect(tapeRangeOf(counted), word).toEqual(bruteForce(steps))
       expect(built, word).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('Lange Tabellen als Bild', () => {
+  const aStar = buildDocument('DFA', ['a'], { start: 'q0', finals: ['q0'] }, [['q0', 'a', 'q0']])
+
+  it('teilt eine sehr lange Simulationstabelle in Bilder, die sich rastern lassen', () => {
+    useEditorStore.getState().loadDocument(structuredClone(aStar), null)
+    useScreenStore.setState({ simulationWord: 'a'.repeat(2000) })
+    const plan = planExport('simulationTable', 'png', 'light')
+    expect(plan.pageCount).toBeGreaterThan(1)
+    for (const page of allPages(plan)) {
+      expect(page.height).toBeLessThanOrEqual(MAX_CANVAS_SIDE)
+      expect(page.width * page.height).toBeLessThanOrEqual(MAX_CANVAS_PIXELS)
+    }
+    // Alle 2001 Konfigurationen kommen vor, die CSV bleibt eine Tabelle
+    expect(plan.table?.rows).toHaveLength(2001)
+  })
+
+  it('lässt kurze Tabellen in einem Bild', () => {
+    expect(planExport('simulationTable', 'png', 'light').pageCount).toBe(1)
   })
 })

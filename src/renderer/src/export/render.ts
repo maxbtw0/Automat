@@ -5,6 +5,23 @@ export type ImageType = 'png' | 'jpeg'
 /** Auflösung: 2 = doppelt so viele Pixel wie im SVG (scharf auf hochauflösenden Displays). */
 const SCALE = 2
 
+/**
+ * Größtes Canvas, das sicher entsteht: Chromium lehnt Seiten über 32 767 Pixel ab, sehr viele
+ * Pixel scheitern am Speicher („Bild konnte nicht erzeugt werden“).
+ */
+export const MAX_CANVAS_SIDE = 32_767
+export const MAX_CANVAS_PIXELS = 2 ** 25
+
+/** Maßstab fürs Rastern: `SCALE`, bei sehr großen Bildern so weit kleiner, dass es passt. */
+export function rasterScale(width: number, height: number): number {
+  return Math.min(
+    SCALE,
+    MAX_CANVAS_SIDE / width,
+    MAX_CANVAS_SIDE / height,
+    Math.sqrt(MAX_CANVAS_PIXELS / (width * height))
+  )
+}
+
 /** Einzelne UTF-16-Hälften (kaputte Surrogate), z. B. aus importierten Dokumenten */
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
 
@@ -27,8 +44,9 @@ export async function rasterize(image: SvgImage, type: ImageType): Promise<Uint8
   await img.decode()
 
   const canvas = document.createElement('canvas')
-  canvas.width = Math.ceil(image.width * SCALE)
-  canvas.height = Math.ceil(image.height * SCALE)
+  const scale = rasterScale(image.width, image.height)
+  canvas.width = Math.floor(image.width * scale)
+  canvas.height = Math.floor(image.height * scale)
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas nicht verfügbar')
   ctx.fillStyle = image.background

@@ -1,5 +1,5 @@
 import type { FileFilter } from '@shared/ipc'
-import { pdfHtml, rasterize } from '@/export/render'
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, pdfHtml, rasterize } from '@/export/render'
 import {
   PALETTES,
   captionSvg,
@@ -146,7 +146,8 @@ const ready = (table: ExportTable | null, pages: SvgImage[]): ExportPlan => ({
 /**
  * Wie Tabellen und Graphen auf die Seiten kommen. PDF: A4-Seiten – Tabellen hoch (lange auf
  * mehrere Seiten verteilt), Graphen quer, mittig, kleine bis aufs Doppelte vergrößert.
- * PNG/JPG/CSV: zugeschnittene Bilder, eine Tabelle immer als ein Bild.
+ * PNG/JPG/CSV: zugeschnittene Bilder, eine Tabelle als ein Bild – als PNG/JPG nur so lange, wie
+ * sie sich in Originalgröße rastern lässt (`rasterParts`), sonst als Bildfolge.
  */
 interface Layout {
   table(table: ExportTable): SvgImage[]
@@ -154,12 +155,28 @@ interface Layout {
 }
 
 function layoutFor(format: ExportFormat, palette: Palette): Layout {
+  if (format === 'png' || format === 'jpg') {
+    return { table: (t) => rasterParts(t, palette), graph: (image) => image }
+  }
   if (format !== 'pdf') return { table: (t) => [tableSvg(t, palette)], graph: (image) => image }
   return {
     table: (t) =>
       paginateTable(t, ROWS_PER_PAGE).map((page) => pageSvg(tableSvg(page, palette), 'portrait')),
     graph: (image) => pageSvg(image, 'landscape', { align: 'center', maxScale: 2 })
   }
+}
+
+/**
+ * Eine Tabelle als Bilder, die sich mindestens in Originalgröße rastern lassen: Ist sie zu
+ * lang (lange Simulationen), wird sie in gleich lange Teile geschnitten.
+ */
+function rasterParts(table: ExportTable, palette: Palette): SvgImage[] {
+  const whole = tableSvg(table, palette)
+  const maxHeight = Math.min(MAX_CANVAS_SIDE, MAX_CANVAS_PIXELS / whole.width)
+  if (whole.height <= maxHeight || table.rows.length <= 1) return [whole]
+  // Etwas Luft für Titel und Kopfzeile, die jeder Teil wieder mitbringt
+  const rows = Math.floor((table.rows.length * maxHeight * 0.9) / whole.height)
+  return paginateTable(table, Math.max(1, rows)).map((part) => tableSvg(part, palette))
 }
 
 function highlightOf(step: SimulationStep, outcome?: 'accepted' | 'rejected') {

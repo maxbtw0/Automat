@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DFA } from '@/core/automaton/dfa'
 import { createAutomaton } from '@/core/automaton/registry'
 import { buildDocument } from '@/core/automaton/testing'
-import { pdfHtml, svgDataUrl } from './render'
+import { MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, pdfHtml, rasterScale, svgDataUrl } from './render'
 import {
   A4,
   MONO,
@@ -461,5 +461,26 @@ describe('svgDataUrl', () => {
   it('ersetzt einzelne Surrogate, statt zu werfen, und behält ganze Emojis', () => {
     expect(decoded('<svg>\uDE00x\uD83D</svg>')).toBe('<svg>�x�</svg>')
     expect(decoded('<svg>😀</svg>')).toBe('<svg>😀</svg>')
+  })
+})
+
+describe('rasterScale', () => {
+  it('rastert normale Bilder doppelt so groß', () => {
+    expect(rasterScale(800, 600)).toBe(2)
+  })
+
+  it('verkleinert, bis Kantenlänge und Pixelzahl ins Canvas passen', () => {
+    for (const [width, height] of [
+      [20_307, 56_190],
+      [40_000, 100],
+      [100, 40_000]
+    ]) {
+      const scale = rasterScale(width, height)
+      expect(Math.floor(width * scale)).toBeLessThanOrEqual(MAX_CANVAS_SIDE)
+      expect(Math.floor(height * scale)).toBeLessThanOrEqual(MAX_CANVAS_SIDE)
+      expect(Math.floor(width * scale) * Math.floor(height * scale)).toBeLessThanOrEqual(
+        MAX_CANVAS_PIXELS
+      )
+    }
   })
 })
