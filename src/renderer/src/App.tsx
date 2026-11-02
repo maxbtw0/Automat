@@ -3,6 +3,7 @@ import { useCloseGuard } from '@/hooks/useCloseGuard'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { useShortcuts } from '@/hooks/useShortcuts'
 import { displayName, runMenuAction } from '@/services/fileActions'
+import { initScreenGuard } from '@/services/screenActions'
 import { initSettings } from '@/services/settingsActions'
 import { useEditorStore } from '@/store/editorStore'
 import { DialogHost } from '@/components/common/DialogHost'
@@ -20,6 +21,7 @@ export function App() {
 
   useEffect(() => window.api?.onMenuAction(runMenuAction), [])
   useEffect(() => initSettings(), [])
+  useEffect(() => initScreenGuard(), [])
 
   const dirty = useEditorStore((s) => s.dirty)
   const filePath = useEditorStore((s) => s.filePath)
