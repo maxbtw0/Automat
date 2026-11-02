@@ -12,18 +12,17 @@ im Stil von AutoEdit/JFLAP, als installierbare Windows-App.
 | DEA, NEA (mit ε) | Prüfung, Simulation, NEA → DEA, Minimierung, Vervollständigen, reguläre Ausdrücke |
 | Kellerautomat (DKA, NKA) | Stackalphabet Γ, Startsymbol, Akzeptanz über Endzustand oder leeren Stack |
 | Turingmaschine (deterministisch) | Bandalphabet Γ ⊇ Σ mit Blank, Matrix-Übergangstabelle, Bandsimulation |
-
-Geplant: Transduktoren (Mealy/Moore).
+| Transduktor (Mealy, Moore) | Ausgabealphabet Δ, Umwandlung Mealy ↔ Moore, Ein- und Ausgabe in der Simulation |
 
 ## Funktionen
 
 - **Grapheneditor:** Zustände und Übergänge zeichnen, Start-/Endzustände, Beschriftung direkt
   am Übergang, Zoom und Verschieben, Touch-Bedienung
-- **Alphabet:** Σ (beim Kellerautomaten zusätzlich Γ, bei der Turingmaschine Γ mit Blank),
-  Voreinstellungen, Sortieren
+- **Alphabet:** Σ (beim Kellerautomaten zusätzlich Γ, bei der Turingmaschine Γ mit Blank,
+  beim Transduktor Δ), Voreinstellungen, Sortieren
 - **Übergangstabelle:** eine Zeile pro Regel bzw. Matrix Zustand × Bandsymbol bei der TM
 - **Simulation:** Schritt für Schritt vor und zurück, Abspielen mit einstellbarer
-  Geschwindigkeit, Tabelle der Konfigurationen, Stack bzw. Band neben dem Graphen
+  Geschwindigkeit, Tabelle der Konfigurationen, Stack, Band bzw. Ausgabe neben dem Graphen
 - **Reguläre Ausdrücke:** Ausdruck aus dem Automaten, Automat aus dem Ausdruck, Vergleich mit
   Gegenbeispiel
 - **Prüfung:** Probleme in der Statusleiste, Klick springt zum betroffenen Element
