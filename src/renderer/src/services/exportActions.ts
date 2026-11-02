@@ -208,15 +208,19 @@ function simulationForExport(document: AutomatonDocument): SimulationSnapshot {
   return { word, steps, index: steps.length - 1, outcome, abortReason }
 }
 
-/** Bandausschnitt über alle Schritte – mit einer leeren Zelle Rand auf jeder Seite */
-function tapeRangeOf(steps: SimulationStep[]): { from: number; to: number } {
-  let from = 0
-  let to = 0
+/**
+ * Bandausschnitt über alle Schritte – mit einer leeren Zelle Rand auf jeder Seite. Eine Regel
+ * schreibt nur unter dem Kopf, also reichen das Anfangsband und die Kopfpositionen: `tape` ist
+ * ein Getter, der das Band jedes Mal neu aufbaut (sonst quadratische Arbeit).
+ */
+export function tapeRangeOf(steps: SimulationStep[]): { from: number; to: number } {
+  const initial = steps[0]?.tape
+  let from = Math.min(0, initial?.start ?? 0)
+  let to = Math.max(0, initial ? initial.start + initial.symbols.length - 1 : 0)
   for (const step of steps) {
-    if (!step.tape) continue
-    const head = step.head ?? 0
-    from = Math.min(from, step.tape.start, head)
-    to = Math.max(to, step.tape.start + step.tape.symbols.length - 1, head)
+    if (step.head === undefined) continue
+    from = Math.min(from, step.head)
+    to = Math.max(to, step.head)
   }
   return { from: from - 1, to: to + 1 }
 }

@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AutomatApi } from '@shared/ipc'
 import { setSimulationLimits } from '@/core/automaton/limits'
 import { buildDocument } from '@/core/automaton/testing'
+import { TuringSimulator } from '@/core/automaton/tmSimulator'
+import type { SimulationStep } from '@/core/automaton/types'
 import { A4 } from '@/export/svg'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
@@ -12,7 +14,8 @@ import {
   defaultExportArea,
   forEachLimited,
   planExport,
-  runExport
+  runExport,
+  tapeRangeOf
 } from './exportActions'
 
 /** Rastern braucht einen echten Browser – hier zählt nur, wie viele gleichzeitig laufen */
@@ -264,5 +267,49 @@ describe('forEachLimited', () => {
     await expect(run).rejects.toThrow('kaputt')
     expect(slowDone).toBe(true)
     expect(started).toEqual([0, 1])
+  })
+})
+
+describe('Bandausschnitt der Turingmaschine', () => {
+  // Läuft über a…a nach rechts (schreibt X), dann bis zwei Felder links vom Anfang
+  const tm = buildDocument('TM', ['a'], { start: 'q0', finals: ['q3'], tape: ['X'] }, [
+    ['q0', 'a → X, R', 'q0'],
+    ['q0', '# → #, L', 'q1'],
+    ['q1', 'X → X, L', 'q1'],
+    ['q1', '# → #, L', 'q2'],
+    ['q2', '# → #, N', 'q3']
+  ])
+
+  /** Wie bisher: jedes Band ganz aufbauen */
+  function bruteForce(steps: SimulationStep[]): { from: number; to: number } {
+    let from = 0
+    let to = 0
+    for (const step of steps) {
+      if (!step.tape) continue
+      const head = step.head ?? 0
+      from = Math.min(from, step.tape.start, head)
+      to = Math.max(to, step.tape.start + step.tape.symbols.length - 1, head)
+    }
+    return { from: from - 1, to: to + 1 }
+  }
+
+  it('stimmt mit dem vollständigen Aufbau überein und baut nur das Anfangsband', () => {
+    for (const word of ['', 'a', 'aaaa']) {
+      const sim = new TuringSimulator(tm, word)
+      const steps = [sim.reset(), ...sim.run().steps]
+      let built = 0
+      const counted = steps.map((step) =>
+        Object.create(step, {
+          tape: {
+            get: () => {
+              built++
+              return step.tape
+            }
+          }
+        })
+      )
+      expect(tapeRangeOf(counted), word).toEqual(bruteForce(steps))
+      expect(built, word).toBeLessThanOrEqual(1)
+    }
   })
 })
