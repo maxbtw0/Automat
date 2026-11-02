@@ -536,6 +536,19 @@ h4 {
 .dialog-title + .dialog-buttons {
   margin-top: 16px;
 }
+/* Rückfrage: so breit wie die Knöpfe (mindestens 420px), Text bestimmt die Breite nicht mit */
+.choice-dialog {
+  width: fit-content;
+  min-width: min(420px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+}
+.choice-dialog .dialog-title,
+.choice-dialog .dialog-detail {
+  contain: inline-size;
+}
+.choice-dialog .dialog-buttons {
+  flex-wrap: wrap;
+}
 
 /* ---------- Export-Fenster ---------- */
 .export-dialog {

@@ -20,7 +20,7 @@ export function DialogHost() {
 
   return (
     <div className="dialog-backdrop" ref={inertOutside}>
-      <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title">
+      <div className="dialog choice-dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title">
         <h2 id="dialog-title" className="dialog-title">
           {request.title}
         </h2>
