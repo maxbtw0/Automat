@@ -1,6 +1,7 @@
-import type { MenuAction, OpenFileResult } from '@shared/ipc'
+import type { MenuAction, OpenFileKind, OpenFileResult } from '@shared/ipc'
 import type { AutomatonDocument } from '@/model/graph'
 import { describeError } from '@/core/automaton/errors'
+import { importAutoEdit, looksLikeXml } from '@/model/autoEdit'
 import { deserializeDocument, serializeDocument } from '@/model/serialization'
 import { askChoice, isModalOpen } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
@@ -43,11 +44,16 @@ export async function closeWindow(): Promise<void> {
   if (await confirmDiscard()) window.api?.closeWindow()
 }
 
-function openFileInBrowser(): Promise<OpenFileResult | null> {
+const BROWSER_ACCEPT: Record<OpenFileKind, string> = {
+  automat: '.json,application/json',
+  autoEdit: '.xml,application/xml,text/xml'
+}
+
+function openFileInBrowser(kind: OpenFileKind): Promise<OpenFileResult | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.json,application/json'
+    input.accept = BROWSER_ACCEPT[kind]
     input.addEventListener('change', async () => {
       const file = input.files?.[0]
       resolve(file ? { filePath: file.name, content: await file.text() } : null)
@@ -71,8 +77,8 @@ export async function newFile(): Promise<void> {
   useEditorStore.getState().loadDocument(createConfiguredDocument(), null)
 }
 
-export function openFile(): Promise<void> {
-  return openFrom(() => (window.api ? window.api.openFile() : openFileInBrowser()))
+export function openFile(kind: OpenFileKind = 'automat'): Promise<void> {
+  return openFrom(() => (window.api ? window.api.openFile(kind) : openFileInBrowser(kind)))
 }
 
 /** Öffnet eine ins Fenster gezogene Datei – mit derselben Rückfrage wie „Öffnen“. */
@@ -89,20 +95,27 @@ async function openFrom(read: () => Promise<OpenFileResult | null>): Promise<voi
   const store = useEditorStore.getState()
   // Das Lesen ist asynchron – wer währenddessen weiterarbeitet, soll nichts verlieren
   const { session, document: before } = store
+  let imported = false
   try {
     const result = await read()
     if (!result) return
-    const document = deserializeDocument(result.content)
+    // AutoEdit-Dateien (XML) werden umgewandelt – egal ob über Import, Öffnen oder Ziehen
+    imported = looksLikeXml(result.content)
+    const document = imported
+      ? importAutoEdit(result.content)
+      : deserializeDocument(result.content)
     const now = useEditorStore.getState()
     if (now.session !== session) return
     if (now.document !== before && !(await confirmDiscard())) return
     if (useEditorStore.getState().session !== session) return
     // Im Browser ist das nur der Dateiname (ohne Ordner) – reicht für den Anzeigenamen.
     // Ohne Pfad (Electron kennt ihn nicht) fragt „Speichern“ wie bei einem neuen Automaten.
-    store.loadDocument(document, result.filePath || null)
+    // Ein Import überschreibt nie die AutoEdit-Datei: „Speichern“ fragt nach einem Ziel
+    store.loadDocument(document, imported ? null : result.filePath || null, imported)
     store.setStatus(null)
   } catch (err) {
-    store.setStatus({ kind: 'error', text: `Öffnen fehlgeschlagen: ${describeError(err)}` })
+    const what = imported ? 'Import' : 'Öffnen'
+    store.setStatus({ kind: 'error', text: `${what} fehlgeschlagen: ${describeError(err)}` })
   }
 }
 
@@ -154,6 +167,9 @@ export function runMenuAction(action: MenuAction): void {
       break
     case 'open':
       void openFile()
+      break
+    case 'importAutoEdit':
+      void openFile('autoEdit')
       break
     case 'save':
       void saveFile()

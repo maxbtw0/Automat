@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'ele
 import { IpcChannels, type AutomatApi, type MenuAction } from '../shared/ipc'
 
 const api: AutomatApi = {
-  openFile: () => ipcRenderer.invoke(IpcChannels.openFile),
+  openFile: (kind) => ipcRenderer.invoke(IpcChannels.openFile, kind),
   pathForFile: (file) => webUtils.getPathForFile(file),
   saveFile: (content, filePath) => ipcRenderer.invoke(IpcChannels.saveFile, content, filePath),
   saveExport: (defaultName, filter, data) =>

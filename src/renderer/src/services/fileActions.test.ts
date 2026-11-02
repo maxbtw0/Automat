@@ -290,6 +290,28 @@ describe('Öffnen während weiterer Änderungen', () => {
     expect(store().document.type).toBe('NFA')
     expect(store().filePath).toBe('/nea.json')
   })
+
+  it('importiert eine AutoEdit-Datei ungespeichert und ohne Pfad', async () => {
+    const pending = openFile('autoEdit')
+    await answerWith(
+      '<AUTOMATON><TYPE value="NEA"/><STATE name="q_0" finalstate="true"/></AUTOMATON>'
+    )
+    await pending
+    expect(store().document.type).toBe('NFA')
+    expect(store().document.graph.states[0].label).toBe('q0')
+    expect(store().filePath).toBeNull()
+    expect(store().dirty).toBe(true)
+  })
+
+  it('meldet einen gescheiterten Import', async () => {
+    const pending = openFile('autoEdit')
+    await answerWith('<AUTOMATON><TYPE value="TM"/></AUTOMATON>')
+    await pending
+    expect(store().status).toEqual({
+      kind: 'error',
+      text: 'Import fehlgeschlagen: AutoEdit-Typ „TM“ wird nicht unterstützt.'
+    })
+  })
 })
 
 describe('Datei ins Fenster ziehen', () => {

@@ -24,6 +24,7 @@ export const IpcChannels = {
 export type MenuAction =
   | 'new'
   | 'open'
+  | 'importAutoEdit'
   | 'save'
   | 'saveAs'
   | 'undo'
@@ -38,6 +39,9 @@ export interface FileFilter {
   extensions: string[]
 }
 
+/** Was der Öffnen-Dialog anbietet: Automat-Dateien oder AutoEdit-Dateien (Import). */
+export type OpenFileKind = 'automat' | 'autoEdit'
+
 export interface OpenFileResult {
   filePath: string
   content: string
@@ -45,7 +49,7 @@ export interface OpenFileResult {
 
 /** Die API, die der Preload als `window.api` bereitstellt. */
 export interface AutomatApi {
-  openFile(): Promise<OpenFileResult | null>
+  openFile(kind?: OpenFileKind): Promise<OpenFileResult | null>
   /** Pfad einer ins Fenster gezogenen Datei, `''` wenn sie keinen hat. */
   pathForFile(file: File): string
   /** Speichert `content`. Ohne `filePath` wird ein Speichern-Dialog gezeigt. Liefert den Pfad oder `null` bei Abbruch. */

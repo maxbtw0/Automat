@@ -11,7 +11,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import iconIco from '../../build/icon.ico?asset'
 import iconPng from '../../build/icon.png?asset'
-import { IpcChannels, type FileFilter, type MenuAction, type OpenFileResult } from '../shared/ipc'
+import {
+  IpcChannels,
+  type FileFilter,
+  type MenuAction,
+  type OpenFileKind,
+  type OpenFileResult
+} from '../shared/ipc'
 import { toAccelerator, type KeyAction } from '../shared/keybindings'
 import {
   defaultSettings,
@@ -60,6 +66,17 @@ const FILE_FILTERS = [
   { name: 'Automat-Dateien', extensions: ['json'] },
   { name: 'Alle Dateien', extensions: ['*'] }
 ]
+
+const OPEN_DIALOGS: Record<OpenFileKind, { title: string; filters: FileFilter[] }> = {
+  automat: { title: 'Automat öffnen', filters: FILE_FILTERS },
+  autoEdit: {
+    title: 'Aus AutoEdit importieren',
+    filters: [
+      { name: 'AutoEdit-Dateien', extensions: ['xml'] },
+      { name: 'Alle Dateien', extensions: ['*'] }
+    ]
+  }
+}
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -126,6 +143,7 @@ function buildMenu(): void {
       submenu: [
         actionItem('Neu', 'new', 'file.new'),
         actionItem('Öffnen …', 'open', 'file.open'),
+        { label: 'Aus AutoEdit importieren …', click: () => sendMenuAction('importAutoEdit') },
         { type: 'separator' },
         actionItem('Speichern', 'save', 'file.save'),
         actionItem('Speichern unter …', 'saveAs', 'file.saveAs'),
@@ -190,21 +208,23 @@ const sequences = new Map<
 >()
 
 function registerIpcHandlers(): void {
-  ipcMain.handle(IpcChannels.openFile, async (event): Promise<OpenFileResult | null> => {
-    const win = BrowserWindow.fromWebContents(event.sender)
-    const options: Electron.OpenDialogOptions = {
-      title: 'Automat öffnen',
-      filters: FILE_FILTERS,
-      properties: ['openFile']
-    }
-    const result = win
-      ? await dialog.showOpenDialog(win, options)
-      : await dialog.showOpenDialog(options)
-    if (result.canceled || result.filePaths.length === 0) return null
+  ipcMain.handle(
+    IpcChannels.openFile,
+    async (event, kind: OpenFileKind = 'automat'): Promise<OpenFileResult | null> => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const options: Electron.OpenDialogOptions = {
+        ...(OPEN_DIALOGS[kind] ?? OPEN_DIALOGS.automat),
+        properties: ['openFile']
+      }
+      const result = win
+        ? await dialog.showOpenDialog(win, options)
+        : await dialog.showOpenDialog(options)
+      if (result.canceled || result.filePaths.length === 0) return null
 
-    const filePath = result.filePaths[0]
-    return { filePath, content: await readFile(filePath, 'utf-8') }
-  })
+      const filePath = result.filePaths[0]
+      return { filePath, content: await readFile(filePath, 'utf-8') }
+    }
+  )
 
   ipcMain.handle(
     IpcChannels.saveFile,

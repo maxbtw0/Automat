@@ -163,7 +163,8 @@ interface EditorState {
 
   // --- Dokument / Datei ---
   newDocument(): void
-  loadDocument(document: AutomatonDocument, filePath: string | null): void
+  /** `unsaved`: noch nirgends gespeichert (Import) – Schließen fragt dann nach. */
+  loadDocument(document: AutomatonDocument, filePath: string | null, unsaved?: boolean): void
   /** `document` = der gespeicherte Stand (Standard: der aktuelle). */
   markSaved(filePath: string | null, document?: AutomatonDocument): void
   setDocumentMeta(patch: Partial<Pick<AutomatonDocument, 'type' | 'alphabet'>>): void
@@ -373,12 +374,17 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     })
   }
 
-  const replaceDocument = (document: AutomatonDocument, filePath: string | null): void =>
+  const replaceDocument = (
+    document: AutomatonDocument,
+    filePath: string | null,
+    unsaved = false
+  ): void =>
     set({
       document,
       filePath,
-      savedDocument: document,
-      dirty: false,
+      // Ungespeichert: kein Stand des Verlaufs gleicht dem gespeicherten
+      savedDocument: unsaved ? createEmptyDocument() : document,
+      dirty: unsaved,
       session: get().session + 1,
       revision: get().revision + 1,
       past: [],
@@ -417,7 +423,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
     setStatus: (status) => set({ status }),
 
     newDocument: () => replaceDocument(createEmptyDocument(), null),
-    loadDocument: (document, filePath) => replaceDocument(document, filePath),
+    loadDocument: (document, filePath, unsaved) => replaceDocument(document, filePath, unsaved),
     markSaved: (filePath, document = get().document) =>
       set((s) => ({ filePath, savedDocument: document, dirty: s.document !== document })),
     setDocumentMeta: (patch) => commit((doc) => ({ ...doc, ...patch })),
