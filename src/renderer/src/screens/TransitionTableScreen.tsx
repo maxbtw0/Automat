@@ -83,13 +83,16 @@ function TransitionList() {
         ? { from, symbol, to: from, output: [] }
         : { from, symbol, to: from }
 
-  /** Erste Kombination ohne Zeile – ab dem Zustand der ausgewählten Zeile. Ziel: Schleife. */
+  /**
+   * Erste Kombination ohne Zeile – ab dem Zustand der ausgewählten Zeile. Ziel: Schleife.
+   * Symbole aus Σ, wo erlaubt zuletzt ε (auch bei leerem Σ).
+   */
   const findFreeEntry = (): TransitionEntry | null => {
     const start = Math.max(0, graph.states.findIndex((s) => s.id === selected?.from))
     const states = [...graph.states.slice(start), ...graph.states.slice(0, start)]
     const pops: (string | undefined)[] = hasStack ? gamma : [undefined]
     for (const state of states) {
-      for (const symbol of alphabet) {
+      for (const symbol of symbolOptions) {
         for (const pop of pops) {
           const exists = entries.some(
             (e) => e.from === state.id && e.symbol === symbol && e.pop === pop
@@ -102,7 +105,7 @@ function TransitionList() {
   }
 
   const handleAdd = (): void => {
-    if (alphabet.length === 0) return setError('Erst ein Alphabet anlegen.')
+    if (symbolOptions.length === 0) return setError('Erst ein Alphabet anlegen.')
     if (hasStack && gamma.length === 0) return setError('Erst ein Stackalphabet anlegen.')
     const entry = findFreeEntry()
     if (entry) {
@@ -111,7 +114,7 @@ function TransitionList() {
       return
     }
     // Keine Zustände oder alle Kombinationen belegt → neuen Zustand mit Schleife anlegen.
-    const symbol = alphabet[0]
+    const symbol = symbolOptions[0]
     const pop = hasStack ? gamma[0] : undefined
     const id = addStateWithEntry(null, (newId) => newEntry(newId, symbol, pop))
     setSelectedKey(entryKey(newEntry(id, symbol, pop)))
