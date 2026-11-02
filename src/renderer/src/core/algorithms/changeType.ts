@@ -51,6 +51,14 @@ export function hasOutputs(document: AutomatonDocument): boolean {
   return document.graph.transitions.some((t) => t.labels.some((l) => (l.output ?? []).length > 0))
 }
 
+/**
+ * Liest eine Regel ε? Turingmaschine und Transduktor lesen in jedem Schritt ein Symbol – beim
+ * Wechsel dorthin entfallen diese Regeln.
+ */
+export function hasEpsilonRules(document: AutomatonDocument): boolean {
+  return document.graph.transitions.some((t) => t.labels.some((l) => l.read === EPSILON))
+}
+
 /** Hat der Akzeptor Endzustände? Transduktoren haben keine. */
 export function hasFinalStates(document: AutomatonDocument): boolean {
   return !usesOutput(document.type) && document.graph.states.some((s) => s.isFinal)

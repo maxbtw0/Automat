@@ -1,5 +1,6 @@
 import {
   changeDocumentType,
+  hasEpsilonRules,
   hasFinalStates,
   hasOutputs,
   hasStackOperations,
@@ -34,7 +35,7 @@ export function convertNfaToMinimalDfa(document: AutomatonDocument): AutomatonDo
  * Turingmaschine → anderer Typ, wenn Schreiben und Bewegung verloren gehen.
  * Mealy ↔ Moore fragt wie NEA → DEA: umwandeln (gleiche Übersetzung), nur den Typ ändern oder
  * abbrechen. Transduktor → Akzeptor fragt, wenn Ausgaben verloren gehen, Akzeptor → Transduktor,
- * wenn Endzustände verloren gehen.
+ * wenn Endzustände verloren gehen, → Turingmaschine oder Transduktor, wenn ε-Regeln entfallen.
  * Die Regeln passt `changeDocumentType` an (z. B. `a` ↔ `a, # → #`).
  */
 export async function changeAutomatonType(type: AutomatonType): Promise<void> {
@@ -87,6 +88,18 @@ export async function changeAutomatonType(type: AutomatonType): Promise<void> {
     const choice = await askChoice({
       title: 'Ausgaben entfernen?',
       detail: 'Von jeder Regel bleibt nur das gelesene Symbol, das Ausgabealphabet entfällt.',
+      buttons: ['Typ ändern', 'Abbrechen']
+    })
+    if (choice !== 0) return
+  }
+
+  if ((type === 'TM' || usesOutput(type)) && hasEpsilonRules(document)) {
+    const choice = await askChoice({
+      title: 'ε-Übergänge entfernen?',
+      detail:
+        type === 'TM'
+          ? 'Eine Turingmaschine liest in jedem Schritt ein Bandsymbol, ε-Regeln entfallen.'
+          : 'Ein Transduktor liest in jedem Schritt ein Symbol, ε-Regeln entfallen.',
       buttons: ['Typ ändern', 'Abbrechen']
     })
     if (choice !== 0) return

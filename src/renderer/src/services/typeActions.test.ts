@@ -147,3 +147,43 @@ describe('changeAutomatonType mit Transduktoren', () => {
     expect(store().document.graph.states.some((s) => s.isFinal)).toBe(false)
   })
 })
+
+describe('changeAutomatonType mit ε-Regeln', () => {
+  /** Akzeptiert ε und a */
+  const epsilonNfa = buildDocument('NFA', ['a'], { start: 'q0', finals: ['q1'] }, [
+    ['q0', 'ε,a', 'q1']
+  ])
+
+  beforeEach(() => store().loadDocument(structuredClone(epsilonNfa), null))
+
+  it('NEA → TM fragt, bevor ε-Regeln entfallen', async () => {
+    let done = changeAutomatonType('TM')
+    expect(useDialogStore.getState().request?.title).toBe('ε-Übergänge entfernen?')
+    useDialogStore.getState().answer(1)
+    await done
+    expect(store().document).toEqual(epsilonNfa)
+
+    done = changeAutomatonType('TM')
+    useDialogStore.getState().answer(0)
+    await done
+    expect(store().document.type).toBe('TM')
+    expect(store().document.graph.transitions[0].labels).toEqual([
+      { read: 'a', write: 'a', move: 'R' }
+    ])
+  })
+
+  it('NEA → Mealy fragt auch nach den ε-Regeln', async () => {
+    const done = changeAutomatonType('MEALY')
+    expect(useDialogStore.getState().request?.title).toBe('ε-Übergänge entfernen?')
+    useDialogStore.getState().answer(1)
+    await done
+    expect(store().document.type).toBe('NFA')
+  })
+
+  it('NEA ohne ε-Regeln → TM fragt nicht', async () => {
+    store().loadDocument(structuredClone(nfa), null)
+    await changeAutomatonType('TM')
+    expect(useDialogStore.getState().request).toBeNull()
+    expect(store().document.type).toBe('TM')
+  })
+})
