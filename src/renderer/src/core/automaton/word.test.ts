@@ -10,6 +10,11 @@ describe('tokenizeWord', () => {
     expect(tokenizeWord('ab', ['a'])).toEqual(['a', 'b'])
   })
 
+  it('liest ein unbekanntes Emoji als ein Zeichen, nicht als zwei halbe', () => {
+    expect(tokenizeWord('😀', ['a'])).toEqual(['😀'])
+    expect(tokenizeWord('a😀a', ['a'])).toEqual(['a', '😀', 'a'])
+  })
+
   it('übergeht ein leeres Symbol, statt endlos zu lesen', () => {
     expect(tokenizeWord('ab', ['', 'a', 'b'])).toEqual(['a', 'b'])
   })

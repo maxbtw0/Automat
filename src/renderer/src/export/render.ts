@@ -5,13 +5,25 @@ export type ImageType = 'png' | 'jpeg'
 /** Auflösung: 2 = doppelt so viele Pixel wie im SVG (scharf auf hochauflösenden Displays). */
 const SCALE = 2
 
+/** Einzelne UTF-16-Hälften (kaputte Surrogate), z. B. aus importierten Dokumenten */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
+
+/**
+ * SVG als data:-URL (Vorschau und Rastern). `encodeURIComponent` wirft bei einzelnen
+ * Surrogaten – die werden vorher zum Ersatzzeichen „�“.
+ */
+export function svgDataUrl(svg: string): string {
+  const safe = svg.replace(LONE_SURROGATE, '�')
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(safe)}`
+}
+
 /**
  * SVG → PNG/JPG. Das SVG wird als data:-URL in ein <img> geladen (erlaubt die CSP) und auf ein
  * Canvas gezeichnet. JPG kennt keine Transparenz, deshalb immer erst weiß füllen.
  */
 export async function rasterize(image: SvgImage, type: ImageType): Promise<Uint8Array> {
   const img = new Image()
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.svg)}`
+  img.src = svgDataUrl(image.svg)
   await img.decode()
 
   const canvas = document.createElement('canvas')

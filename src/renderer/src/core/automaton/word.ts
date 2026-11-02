@@ -6,8 +6,8 @@
  *
  * Innerhalb eines Stücks ohne Leerzeichen dürfen Symbole mehrere Zeichen haben (z. B. „x1“),
  * deshalb wird an jeder Stelle das längste passende Symbol genommen. Passt keins, wird ein
- * einzelnes Zeichen gelesen – das liegt dann nicht in Σ, es gibt keinen Übergang dafür und der
- * Automat verwirft.
+ * einzelnes Zeichen gelesen (ein ganzer Unicode-Codepoint, auch ein Emoji) – das liegt dann
+ * nicht in Σ, es gibt keinen Übergang dafür und der Automat verwirft.
  */
 export function tokenizeWord(word: string, alphabet: string[]): string[] {
   // Ein leeres Symbol passt überall, ohne voranzukommen – es würde endlos lesen
@@ -16,7 +16,8 @@ export function tokenizeWord(word: string, alphabet: string[]): string[] {
   for (const part of word.split(/\s+/)) {
     let i = 0
     while (i < part.length) {
-      const symbol = byLength.find((s) => part.startsWith(s, i)) ?? part[i]
+      const symbol =
+        byLength.find((s) => part.startsWith(s, i)) ?? String.fromCodePoint(part.codePointAt(i)!)
       tokens.push(symbol)
       i += symbol.length
     }

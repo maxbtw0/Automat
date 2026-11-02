@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '@/components/common/Icon'
 import { describeError } from '@/core/automaton/errors'
+import { svgDataUrl } from '@/export/render'
 import type { ExportTheme } from '@/export/svg'
 import {
   CONTENT_LABEL,
@@ -228,10 +229,7 @@ export function ExportDialog() {
           <span className="section-label">Vorschau</span>
           <div className="export-preview">
             {shown ? (
-              <img
-                alt="Vorschau"
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(shown.svg)}`}
-              />
+              <img alt="Vorschau" src={svgDataUrl(shown.svg)} />
             ) : (
               plan && !plan.ok && <p className="export-error">{plan.error}</p>
             )}

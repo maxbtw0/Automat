@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DFA } from '@/core/automaton/dfa'
 import { createAutomaton } from '@/core/automaton/registry'
 import { buildDocument } from '@/core/automaton/testing'
-import { pdfHtml } from './render'
+import { pdfHtml, svgDataUrl } from './render'
 import {
   A4,
   MONO,
@@ -452,5 +452,14 @@ describe('Export Transduktor', () => {
       { current: 1, word: '01' }
     )
     expect(reserved.width).toBeGreaterThan(image.width)
+  })
+})
+
+describe('svgDataUrl', () => {
+  const decoded = (svg: string): string => decodeURIComponent(svgDataUrl(svg).split(',')[1])
+
+  it('ersetzt einzelne Surrogate, statt zu werfen, und behält ganze Emojis', () => {
+    expect(decoded('<svg>\uDE00x\uD83D</svg>')).toBe('<svg>�x�</svg>')
+    expect(decoded('<svg>😀</svg>')).toBe('<svg>😀</svg>')
   })
 })
