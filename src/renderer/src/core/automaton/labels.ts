@@ -218,30 +218,39 @@ const TURING_RULE = /^([^→/]*?)(?:→|->|\/)(.*)$/
  * Kurzform ohne Pfeil: „a A R“ = lies a, schreibe A, gehe nach rechts; „a R“ schreibt a zurück.
  * Getrennt durch Leerzeichen oder Komma.
  */
-function parseShortTuringRule(text: string, blank: string): TransitionLabel | null {
+function parseShortTuringRule(
+  text: string,
+  blank: string,
+  tapeAlphabet: readonly string[]
+): TransitionLabel | null {
   const parts = text.split(/[\s,]+/).filter(Boolean)
   if (parts.length < 2 || parts.length > 3) return null
   const move = parseMove(parts.at(-1) ?? '')
   if (!move) return null
-  const read = normalizeTapeSymbol(parts[0], blank)
-  const write = parts.length === 3 ? normalizeTapeSymbol(parts[1], blank) : read
+  const read = normalizeTapeSymbol(parts[0], blank, tapeAlphabet)
+  const write = parts.length === 3 ? normalizeTapeSymbol(parts[1], blank, tapeAlphabet) : read
   return { read, write, move }
 }
 
 /**
  * Eine Turingregel „a → X, R“ oder kurz „a X R“ – `null`, wenn der Text keine Regel ist.
  * „a → R“ bzw. „a R“ schreibt das gelesene Symbol zurück, eine leere Leseseite oder „_“ meint
- * das Blank. Die Bewegung darf auch klein geschrieben sein.
+ * das Blank – außer „_“ steht selbst in Γ. Die Bewegung darf auch klein geschrieben sein.
  */
-export function parseTuringRule(text: string, blank: string): TransitionLabel | null {
+export function parseTuringRule(
+  text: string,
+  blank: string,
+  tapeAlphabet: readonly string[] = []
+): TransitionLabel | null {
   const match = TURING_RULE.exec(text.trim())
-  if (!match) return parseShortTuringRule(text, blank)
-  const read = normalizeTapeSymbol(match[1], blank) || blank
+  if (!match) return parseShortTuringRule(text, blank, tapeAlphabet)
+  const read = normalizeTapeSymbol(match[1], blank, tapeAlphabet) || blank
   const parts = match[2].split(',').map((p) => p.trim())
   if (parts.length > 2 || /\s/.test(read)) return null
   const move = parseMove(parts.at(-1) ?? '')
   if (!move) return null
-  const write = parts.length === 2 ? normalizeTapeSymbol(parts[0], blank) || blank : read
+  const write =
+    parts.length === 2 ? normalizeTapeSymbol(parts[0], blank, tapeAlphabet) || blank : read
   if (/\s/.test(write)) return null
   return { read, write, move }
 }
@@ -300,10 +309,12 @@ export function parseLabels(text: string, document: AutomatonDocument): LabelPar
   const tape = usesTape(document.type)
   if (!tape && !usesStack(document.type)) return { labels: symbolLabels(parseSymbols(text)) }
   const stackAlphabet = stackSettings(document).alphabet
-  const { blank } = tapeSettings(document)
+  const { blank, alphabet: tapeAlphabet } = tapeSettings(document)
   const labels: TransitionLabel[] = []
   for (const rule of text.split(/[;\n]/).map((r) => r.trim()).filter(Boolean)) {
-    const label = tape ? parseTuringRule(rule, blank) : parsePushdownRule(rule, stackAlphabet)
+    const label = tape
+      ? parseTuringRule(rule, blank, tapeAlphabet)
+      : parsePushdownRule(rule, stackAlphabet)
     if (!label) {
       const kind = tape ? 'Bandregel (a A R)' : 'Stackregel (a, Z → AZ)'
       return { error: `„${rule}“ ist keine ${kind}` }

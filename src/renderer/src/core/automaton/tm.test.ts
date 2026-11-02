@@ -3,6 +3,7 @@ import { changeDocumentType, hasTapeOperations } from '@/core/algorithms/changeT
 import { BLANK, type AutomatonDocument } from '@/model/graph'
 import {
   formatLabel,
+  formatLabelsInline,
   formatTape,
   labelLines,
   nextTuringLabel,
@@ -101,6 +102,23 @@ describe('Turingmaschine – Regeln als Text', () => {
     expect(parseTuringRule('a _ R', 'X')).toEqual({ read: 'a', write: 'X', move: 'R' })
     // Beim üblichen Blank bleibt „#“ das Blank
     expect(parseTuringRule('# → #, R', BLANK)).toEqual({ read: BLANK, write: BLANK, move: 'R' })
+  })
+
+  it('„_“ in Γ bleibt ein eigenes Bandsymbol, auch nach Enter ohne Änderung', () => {
+    const dfa = buildDocument('DFA', ['_'], { start: 'q0', finals: ['q1'] }, [['q0', '_', 'q1']])
+    const tm = changeDocumentType(dfa, 'TM')
+    const [edge] = tm.graph.transitions
+    expect(edge.labels).toEqual([{ read: '_', write: '_', move: 'R' }])
+    const text = formatLabelsInline(edge.labels)
+    expect(parseLabels(text, tm)).toEqual({ labels: edge.labels })
+    // Das Blank lässt sich weiter als „#“ oder leer schreiben
+    expect(parseLabels('_ → #, L; → , N', tm)).toEqual({
+      labels: [
+        { read: '_', write: BLANK, move: 'L' },
+        { read: BLANK, write: BLANK, move: 'N' }
+      ]
+    })
+    expect(createAutomaton(tm).accepts('_')).toBe(true)
   })
 
   it('meldet Text ohne gültige Bewegung', () => {

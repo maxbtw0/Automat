@@ -212,10 +212,17 @@ export function tapeSettings(document: AutomatonDocument): TapeSettings {
   return document.tape ?? createTapeSettings(document.alphabet)
 }
 
-/** Vereinheitlicht ein eingegebenes Bandsymbol („_“ → Blank). */
-export function normalizeTapeSymbol(symbol: string, blank: string): string {
+/**
+ * Vereinheitlicht ein eingegebenes Bandsymbol („_“ → Blank). Steht „_“ bzw. □ selbst in Γ
+ * (`tapeAlphabet`), bleibt es dieses Symbol – das Blank schreibt man dann als Blank oder leer.
+ */
+export function normalizeTapeSymbol(
+  symbol: string,
+  blank: string,
+  tapeAlphabet: readonly string[] = []
+): string {
   const trimmed = symbol.trim()
-  return BLANK_SPELLINGS.has(trimmed) ? blank : trimmed
+  return BLANK_SPELLINGS.has(trimmed) && !tapeAlphabet.includes(trimmed) ? blank : trimmed
 }
 
 export function createEmptyDocument(

@@ -88,7 +88,7 @@ export function TuringCellDialog({
 
   /** Getipptes Symbol muss in Γ sein („_“ = Blank) */
   const commitWrite = (input: string): boolean => {
-    const symbol = normalizeTapeSymbol(input, blank) || blank
+    const symbol = normalizeTapeSymbol(input, blank, tapeAlphabet) || blank
     if (!tapeAlphabet.includes(symbol)) {
       setError(`„${symbol}“ nicht im Bandalphabet`)
       return false

@@ -448,7 +448,7 @@ function TuringRuleList({
 
   /** Lesen bzw. Schreiben: ein Symbol aus Γ (leer oder „_“ = Blank) */
   const commitSymbol = (index: number, field: 'read' | 'write', input: string): boolean => {
-    const symbol = normalizeTapeSymbol(input, blank) || blank
+    const symbol = normalizeTapeSymbol(input, blank, gamma) || blank
     if (!gamma.includes(symbol)) return fail(`„${symbol}“ nicht im Bandalphabet`)
     replace(index, { ...asTuring(labels[index]), [field]: symbol })
     return true
