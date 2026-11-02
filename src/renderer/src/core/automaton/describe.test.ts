@@ -31,6 +31,17 @@ describe('describeStep', () => {
     expect(descriptions(doc, 'b').at(-1)).toBe('Es gibt keinen Übergang mit „b“.')
   })
 
+  it('NEA: Start mit ε-Hülle, eingegebenes „ε“ liegt nicht in Σ', () => {
+    const doc = buildDocument('NFA', ['a'], { start: 'q0', finals: ['q1'] }, [
+      ['q0', 'ε', 'q1'],
+      ['q1', 'a', 'q1']
+    ])
+    expect(descriptions(doc, 'ε')).toEqual([
+      'Start in Zustand q0, über ε-Übergänge auch in q1.',
+      '„ε“ liegt nicht in Σ.'
+    ])
+  })
+
   it('NEA: mehrere Zustände, Endzustand markiert', () => {
     const doc = buildDocument('NFA', ['a'], { start: 'q0', finals: ['q2'] }, [
       ['q0', 'a', 'q1'],

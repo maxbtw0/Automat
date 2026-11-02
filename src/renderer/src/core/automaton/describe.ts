@@ -45,10 +45,15 @@ export function describeStep(
     word.length === 0 ? 'nichts ausgegeben' : `${quote(formatWord(word, delta))} ausgegeben`
 
   if (step.index === 0 || !previous) {
+    // Mehrere Zustände am Anfang: der Startzustand und seine ε-Hülle
+    const initial = graph.states.find((s) => s.isStart && states.includes(s.id))
+    const others = states.filter((id) => id !== initial?.id).map(label)
     const start =
       states.length === 1
         ? `Start in Zustand ${label(states[0])}`
-        : `Start in den Zuständen ${joinList(states.map(label))}`
+        : initial
+          ? `Start in Zustand ${initial.label}, über ε-Übergänge auch in ${joinList(others)}`
+          : `Start in den Zuständen ${joinList(states.map(label))}`
     const stack = step.stack && `, auf dem Stack liegt ${quote(formatStack(step.stack, gamma))}`
     // Moore gibt schon im Startzustand etwas aus
     const first = piece && piece.length > 0 ? `, dabei wird ${output(piece)}` : ''
@@ -56,7 +61,11 @@ export function describeStep(
   }
 
   const read = step.label?.read ?? step.symbol ?? EPSILON
-  if (states.length === 0) return sentence(`Es gibt keinen Übergang mit ${quote(read)}`)
+  if (states.length === 0) {
+    // Ein eingegebenes „ε“ (oder anderes fremdes Zeichen) kann keine Regel lesen
+    if (!document.alphabet.includes(read)) return sentence(`${quote(read)} liegt nicht in Σ`)
+    return sentence(`Es gibt keinen Übergang mit ${quote(read)}`)
+  }
 
   const clauses = [read === EPSILON ? 'nichts gelesen' : `${quote(read)} gelesen`]
   const rule = step.label
