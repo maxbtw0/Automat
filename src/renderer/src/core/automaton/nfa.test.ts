@@ -171,3 +171,39 @@ describe('isDeterministic: Schlüssel', () => {
     expect(isDeterministic(doc)).toBe(true)
   })
 })
+
+describe('Lange ε-Ketten', () => {
+  /** q0 →ε q1 →ε … →ε q(n−1) (Endzustand) →a q0: akzeptiert a* */
+  function chain(n: number) {
+    const rules: [string, string, string][] = []
+    for (let i = 0; i + 1 < n; i++) rules.push([`q${i}`, EPSILON, `q${i + 1}`])
+    rules.push([`q${n - 1}`, 'a', 'q0'])
+    return buildDocument('NFA', ['a'], { start: 'q0', finals: [`q${n - 1}`] }, rules)
+  }
+
+  /** Zählt, wie oft der Simulator Kantenenden liest */
+  function countedReads(n: number, word: string): number {
+    const doc = chain(n)
+    let reads = 0
+    const transitions = doc.graph.transitions.map(
+      (t) =>
+        new Proxy(t, {
+          get(target, key, receiver) {
+            if (key === 'from' || key === 'to') reads++
+            return Reflect.get(target, key, receiver)
+          }
+        })
+    )
+    const counted = { ...doc, graph: { ...doc.graph, transitions } }
+    expect(new NFA(counted).accepts(word)).toBe(true)
+    return reads
+  }
+
+  it('liest Kantenenden nur linear oft (je Zeichen und Zustand)', () => {
+    // Vorher quadratisch: 15 897 / 58 721 / 225 009 Lesezugriffe für 16 / 32 / 64 Zustände
+    const small = countedReads(32, 'a'.repeat(20))
+    const large = countedReads(64, 'a'.repeat(20))
+    expect(large).toBeLessThan(small * 2.5)
+    expect(large).toBeLessThan(20 * 64 * 20)
+  })
+})

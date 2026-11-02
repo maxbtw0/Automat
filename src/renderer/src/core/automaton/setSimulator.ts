@@ -17,15 +17,39 @@ export interface StateSetResult {
   transitionIds: TransitionId[]
 }
 
-/** ε-Hülle: alle Zustände, die von `states` aus nur über ε-Übergänge erreichbar sind (inkl. selbst). */
-export function epsilonClosure(graph: EditorGraph, states: Iterable<StateId>): StateSetResult {
+/** Übergänge nach Ausgangs- (`from`) bzw. Zielzustand (`to`) – einmal sortiert, nicht je Suche */
+type EdgesByState = Map<StateId, TransitionEdge[]>
+
+function edgesByState(transitions: TransitionEdge[], key: 'from' | 'to'): EdgesByState {
+  const result: EdgesByState = new Map()
+  for (const t of transitions) {
+    const list = result.get(t[key])
+    if (list) list.push(t)
+    else result.set(t[key], [t])
+  }
+  return result
+}
+
+/** ε-Übergänge nach Ausgangszustand */
+function epsilonEdges(graph: EditorGraph): EdgesByState {
+  return edgesByState(graph.transitions.filter((t) => readsSymbol(t, EPSILON)), 'from')
+}
+
+/**
+ * ε-Hülle: alle Zustände, die von `states` aus nur über ε-Übergänge erreichbar sind (inkl.
+ * selbst). `epsilons` = schon nach Zustand sortierte ε-Übergänge, für viele Aufrufe.
+ */
+export function epsilonClosure(
+  graph: EditorGraph,
+  states: Iterable<StateId>,
+  epsilons: EdgesByState = epsilonEdges(graph)
+): StateSetResult {
   const result = new Set(states)
   const used: TransitionId[] = []
   const todo = [...result]
   while (todo.length > 0) {
     const current = todo.pop() as StateId
-    for (const t of graph.transitions) {
-      if (t.from !== current || !readsSymbol(t, EPSILON)) continue
+    for (const t of epsilons.get(current) ?? []) {
       used.push(t.id)
       if (!result.has(t.to)) {
         result.add(t.to)
@@ -80,6 +104,9 @@ export class StateSetSimulator implements Simulator {
   /** Ausgedünnte Zustände und Übergänge pro Schicht – das, was angezeigt wird */
   private readonly shown: { stateIds: StateId[]; transitionIds: TransitionId[] }[]
   private readonly finals: Set<StateId>
+  /** Übergänge pro Ausgangszustand – sonst durchsucht jeder Schritt alle Übergänge */
+  private readonly outgoing: EdgesByState
+  private readonly epsilons: EdgesByState
   private position = 0
 
   constructor(
@@ -89,6 +116,8 @@ export class StateSetSimulator implements Simulator {
   ) {
     this.tokens = tokenizeWord(word, document.alphabet)
     this.finals = new Set(document.graph.states.filter((s) => s.isFinal).map((s) => s.id))
+    this.outgoing = edgesByState(document.graph.transitions, 'from')
+    this.epsilons = options.epsilon ? epsilonEdges(document.graph) : new Map()
     this.layers = this.computeLayers()
     this.shown = this.prune()
   }
@@ -125,12 +154,11 @@ export class StateSetSimulator implements Simulator {
    */
   private computeLayers(): Layer[] {
     const { graph } = this.document
+    const { outgoing, epsilons } = this
     const epsilonsFrom = (states: Set<StateId>): TransitionEdge[] =>
-      this.options.epsilon
-        ? graph.transitions.filter((t) => states.has(t.from) && readsSymbol(t, EPSILON))
-        : []
+      [...states].flatMap((q) => epsilons.get(q) ?? [])
     const closure = (states: Iterable<StateId>): Set<StateId> =>
-      this.options.epsilon ? epsilonClosure(graph, states).states : new Set(states)
+      this.options.epsilon ? epsilonClosure(graph, states, epsilons).states : new Set(states)
 
     const start = startState(graph)
     const first = closure(start ? [start.id] : [])
@@ -139,9 +167,12 @@ export class StateSetSimulator implements Simulator {
       const previous = layers[layers.length - 1].states
       if (previous.size === 0) break
       // Ein „ε“ im Wort liegt nie in Σ: kein Übergang liest es, auch kein ε-Übergang
-      const moves = graph.transitions.filter(
-        (t) => symbol !== EPSILON && previous.has(t.from) && readsSymbol(t, symbol)
-      )
+      const moves =
+        symbol === EPSILON
+          ? []
+          : [...previous].flatMap((q) =>
+              (outgoing.get(q) ?? []).filter((t) => readsSymbol(t, symbol))
+            )
       const states = closure(moves.map((t) => t.to))
       layers.push({ states, moves, epsilons: epsilonsFrom(states) })
     }
@@ -160,15 +191,15 @@ export class StateSetSimulator implements Simulator {
 
     const useful: Set<StateId>[] = layers.map(() => new Set())
     for (let i = last; i >= 0; i--) {
-      // Wer per ε einen nützlichen Zustand erreicht, ist selbst nützlich
+      // Wer per ε einen nützlichen Zustand erreicht, ist selbst nützlich (Suche rückwärts)
       const set = new Set(targets)
-      for (let changed = true; changed; ) {
-        changed = false
-        for (const t of layers[i].epsilons) {
-          if (set.has(t.to) && !set.has(t.from)) {
-            set.add(t.from)
-            changed = true
-          }
+      const into = edgesByState(layers[i].epsilons, 'to')
+      const todo = [...set]
+      while (todo.length > 0) {
+        for (const t of into.get(todo.pop() as StateId) ?? []) {
+          if (set.has(t.from)) continue
+          set.add(t.from)
+          todo.push(t.from)
         }
       }
       useful[i] = set
