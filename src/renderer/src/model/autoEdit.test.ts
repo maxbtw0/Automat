@@ -126,6 +126,25 @@ describe('importAutoEdit', () => {
     expect(second.x).toBeGreaterThan(first.x)
   })
 
+  it('trennt Zustände, die im Layout genau übereinander liegen', () => {
+    const state = (name: string, left: number) =>
+      `<STATELAYOUT name="${name}"><LEFT value="${left}"/><TOP value="0"/></STATELAYOUT>`
+    const doc = importAutoEdit(`
+      <AUTOMATON><TYPE value="DEA"/><ALPHABET><ITEM value="a"/></ALPHABET>
+        <STATE name="q0" finalstate="false"/><STATE name="q1" finalstate="false"/>
+        <STATE name="q2" finalstate="true"/><INITIALSTATE value="q0"/>
+        <LAYOUT>${state('q0', 0)}${state('q1', 0)}${state('q2', 40)}</LAYOUT>
+      </AUTOMATON>`)
+    const points = doc.graph.states
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const d = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y)
+        expect(d, `${points[i].label}–${points[j].label}`).toBeGreaterThanOrEqual(150)
+      }
+    }
+    expect(points[0]).toMatchObject({ x: R, y: R })
+  })
+
   it('meldet unbekannte Typen und kaputte Dateien', () => {
     expect(() => importAutoEdit('<AUTOMATON><TYPE value="MOORE"/></AUTOMATON>')).toThrow(
       'AutoEdit-Typ „MOORE“ wird nicht unterstützt.'

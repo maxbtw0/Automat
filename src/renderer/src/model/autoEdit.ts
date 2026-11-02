@@ -104,22 +104,48 @@ function spreadOut(
   points: Map<string, { x: number; y: number }>
 ): Map<string, { x: number; y: number }> {
   const list = [...points.values()]
+  // Zustände auf derselben Stelle zählen hier nicht – die trennt `separateCoincident`
   let closest = Infinity
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
-      closest = Math.min(closest, Math.hypot(list[i].x - list[j].x, list[i].y - list[j].y))
+      const d = Math.hypot(list[i].x - list[j].x, list[i].y - list[j].y)
+      if (d > 0) closest = Math.min(closest, d)
     }
   }
-  if (!(closest > 0 && closest < MIN_DISTANCE)) return points
+  if (!(closest < MIN_DISTANCE)) return separateCoincident(points)
   const factor = MIN_DISTANCE / closest
   const left = Math.min(...list.map((p) => p.x))
   const top = Math.min(...list.map((p) => p.y))
-  return new Map(
-    [...points].map(([name, p]) => [
-      name,
-      { x: left + (p.x - left) * factor, y: top + (p.y - top) * factor }
-    ])
+  return separateCoincident(
+    new Map(
+      [...points].map(([name, p]) => [
+        name,
+        { x: left + (p.x - left) * factor, y: top + (p.y - top) * factor }
+      ])
+    )
   )
+}
+
+/**
+ * Liegen Zustände genau übereinander, rückt jeder weitere so weit nach rechts, bis er
+ * mindestens `MIN_DISTANCE` von allen schon gesetzten entfernt ist.
+ */
+function separateCoincident(
+  points: Map<string, { x: number; y: number }>
+): Map<string, { x: number; y: number }> {
+  const placed: { x: number; y: number }[] = []
+  const result = new Map<string, { x: number; y: number }>()
+  const near = (p: { x: number; y: number }, limit: number): boolean =>
+    placed.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < limit)
+  for (const [name, original] of points) {
+    let p = original
+    if (near(p, 1)) {
+      while (near(p, MIN_DISTANCE)) p = { x: p.x + MIN_DISTANCE, y: p.y }
+    }
+    placed.push(p)
+    result.set(name, p)
+  }
+  return result
 }
 
 /** Symbole aus `<ALPHABET>`, `<STACKALPHABET>` usw. – ohne Doppelte und ohne ε */
