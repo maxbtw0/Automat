@@ -180,6 +180,21 @@ function readTape(root: XmlElement, alphabet: string[]): TapeSettings {
   return { alphabet: [...symbols, blank], blank }
 }
 
+/**
+ * Push-Wort aus `write`: AutoEdit schreibt das leere Wort als „EPSILON“. Kurzformen wie „eps“
+ * gelten nur dann als ε, wenn sie sich nicht in Symbole aus Γ zerlegen lassen – bei
+ * Γ = {e, p, s, …} ist „eps“ ein Wort aus drei Symbolen.
+ */
+function readPushWord(write: string, stackAlphabet: string[]): string[] {
+  const text = write.trim()
+  if (text === '' || text === 'EPSILON' || text === EPSILON) return []
+  const symbols = tokenizeWord(text, stackAlphabet)
+  if (normalizeSymbol(text) === EPSILON && !symbols.every((s) => stackAlphabet.includes(s))) {
+    return []
+  }
+  return symbols
+}
+
 function readLabel(
   label: XmlElement,
   type: AutomatonType,
@@ -187,11 +202,10 @@ function readLabel(
 ): TransitionLabel {
   const read = normalizeSymbol(attribute(label, 'read'))
   if (stack) {
-    const write = normalizeSymbol(attribute(label, 'write'))
     return {
       read,
       pop: normalizeSymbol(attribute(label, 'topofstack')),
-      push: write === EPSILON ? [] : tokenizeWord(write, stack.alphabet)
+      push: readPushWord(attribute(label, 'write'), stack.alphabet)
     }
   }
   if (type === 'TM') {

@@ -193,6 +193,38 @@ describe('importAutoEdit – Kellerautomat', () => {
     expect(rules).toContainEqual({ read: EPSILON, pop: '$', push: [] })
   })
 
+  it('liest „eps“ als Push-Wort aus Γ, „EPSILON“ als leeres Wort', () => {
+    const doc = importAutoEdit(`
+      <AUTOMATON><TYPE value="DKA"/><ALPHABET><ITEM value="a"/><ITEM value="b"/></ALPHABET>
+        <STACKALPHABET><ITEM value="$"/><ITEM value="e"/><ITEM value="p"/><ITEM value="s"/></STACKALPHABET>
+        <STATE name="q0" finalstate="false"><TRANSITION target="q1">
+          <LABEL read="a" topofstack="$" write="eps"/></TRANSITION></STATE>
+        <STATE name="q1" finalstate="false"><TRANSITION target="q2">
+          <LABEL read="b" topofstack="e" write="EPSILON"/></TRANSITION></STATE>
+        <STATE name="q2" finalstate="true"/>
+        <INITIALSTATE value="q0"/><STACKINITIALCHAR value="$"/>
+      </AUTOMATON>`)
+    const rules = doc.graph.transitions.flatMap((t) => t.labels)
+    expect(rules).toEqual([
+      { read: 'a', pop: '$', push: ['e', 'p', 's'] },
+      { read: 'b', pop: 'e', push: [] }
+    ])
+    const automaton = createAutomaton(doc)
+    expect(automaton.validate()).toEqual([])
+    expect(automaton.accepts('ab')).toBe(true)
+  })
+
+  it('liest „eps“ als leeres Wort, wenn Γ die Buchstaben nicht hat', () => {
+    const doc = importAutoEdit(`
+      <AUTOMATON><TYPE value="DKA"/><ALPHABET><ITEM value="a"/></ALPHABET>
+        <STACKALPHABET><ITEM value="$"/></STACKALPHABET>
+        <STATE name="q0" finalstate="true"><TRANSITION target="q0">
+          <LABEL read="a" topofstack="$" write="eps"/></TRANSITION></STATE>
+        <INITIALSTATE value="q0"/><STACKINITIALCHAR value="$"/>
+      </AUTOMATON>`)
+    expect(doc.graph.transitions[0].labels).toEqual([{ read: 'a', pop: '$', push: [] }])
+  })
+
   it('erkennt mit den Lösungen dieselben Sprachen wie die Aufgaben', () => {
     const cases: [string, (w: string) => boolean][] = [
       [atoccDpda, isAnBn],
@@ -233,6 +265,15 @@ describe('importAutoEdit – Turingmaschine', () => {
     }
   })
 
+  it('behält ohne TAPEINITIALCHAR das deklarierte Γ und wählt ein freies Blank', () => {
+    const doc = importAutoEdit(atoccAnBnCn.replace(/<TAPEINITIALCHAR[^>]*\/>/, ''))
+    const tape = doc.tape!
+    expect(tape.alphabet).toEqual(expect.arrayContaining(['X', '-', '$', 'a', 'b', 'c']))
+    expect(tape.alphabet.at(-1)).toBe(tape.blank)
+    expect(['X', '-', '$', 'a', 'b', 'c']).not.toContain(tape.blank)
+    expect(createAutomaton(doc).validate()).toEqual([])
+  })
+
   it('erkennt aⁿbⁿcⁿ', () => {
     const automaton = createAutomaton(importAutoEdit(atoccAnBnCn))
     expect(automaton.validate()).toEqual([])
@@ -262,12 +303,3 @@ describe('looksLikeXml', () => {
     expect(looksLikeXml('{"format":"automat"}')).toBe(false)
   })
 })
-
-  it('behält ohne TAPEINITIALCHAR das deklarierte Γ und wählt ein freies Blank', () => {
-    const doc = importAutoEdit(atoccAnBnCn.replace(/<TAPEINITIALCHAR[^>]*\/>/, ''))
-    const tape = doc.tape!
-    expect(tape.alphabet).toEqual(expect.arrayContaining(['X', '-', '$', 'a', 'b', 'c']))
-    expect(tape.alphabet.at(-1)).toBe(tape.blank)
-    expect(['X', '-', '$', 'a', 'b', 'c']).not.toContain(tape.blank)
-    expect(createAutomaton(doc).validate()).toEqual([])
-  })
