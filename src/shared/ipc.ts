@@ -44,7 +44,8 @@ export type OpenFileKind = 'automat' | 'autoEdit'
 
 export interface OpenFileResult {
   filePath: string
-  content: string
+  /** Die Bytes der Datei – dekodiert wird im Renderer (`decodeFileText`) */
+  data: Uint8Array
 }
 
 /** Die API, die der Preload als `window.api` bereitstellt. */

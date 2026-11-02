@@ -1,4 +1,5 @@
 import type { MenuAction, OpenFileKind, OpenFileResult } from '@shared/ipc'
+import { decodeFileText } from '@shared/textDecoding'
 import type { AutomatonDocument } from '@/model/graph'
 import { describeError } from '@/core/automaton/errors'
 import { importAutoEdit, looksLikeXml } from '@/model/autoEdit'
@@ -56,7 +57,7 @@ function openFileInBrowser(kind: OpenFileKind): Promise<OpenFileResult | null> {
     input.accept = BROWSER_ACCEPT[kind]
     input.addEventListener('change', async () => {
       const file = input.files?.[0]
-      resolve(file ? { filePath: file.name, content: await file.text() } : null)
+      resolve(file ? { filePath: file.name, data: await fileBytes(file) } : null)
     })
     input.addEventListener('cancel', () => resolve(null))
     input.click()
@@ -86,8 +87,13 @@ export function openDroppedFile(file: File): Promise<void> {
   return openFrom(async () => ({
     // Im Browser gibt es keinen Pfad – der Dateiname reicht für den Anzeigenamen
     filePath: window.api ? window.api.pathForFile(file) : file.name,
-    content: await file.text()
+    data: await fileBytes(file)
   }))
+}
+
+/** Bytes statt `file.text()` – das dekodiert immer als UTF-8, auch Latin-1-XML */
+async function fileBytes(file: File): Promise<Uint8Array> {
+  return new Uint8Array(await file.arrayBuffer())
 }
 
 async function openFrom(read: () => Promise<OpenFileResult | null>): Promise<void> {
@@ -99,11 +105,10 @@ async function openFrom(read: () => Promise<OpenFileResult | null>): Promise<voi
   try {
     const result = await read()
     if (!result) return
+    const content = decodeFileText(result.data)
     // AutoEdit-Dateien (XML) werden umgewandelt – egal ob über Import, Öffnen oder Ziehen
-    imported = looksLikeXml(result.content)
-    const document = imported
-      ? importAutoEdit(result.content)
-      : deserializeDocument(result.content)
+    imported = looksLikeXml(content)
+    const document = imported ? importAutoEdit(content) : deserializeDocument(content)
     const now = useEditorStore.getState()
     if (now.session !== session) return
     if (now.document !== before && !(await confirmDiscard())) return

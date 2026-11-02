@@ -253,7 +253,11 @@ describe('Öffnen während weiterer Änderungen', () => {
   beforeEach(() => {
     finish = null
     const openFile: AutomatApi['openFile'] = () =>
-      new Promise((resolve) => (finish = (content) => resolve({ filePath: '/nea.json', content })))
+      new Promise(
+        (resolve) =>
+          (finish = (content) =>
+            resolve({ filePath: '/nea.json', data: new TextEncoder().encode(content) }))
+      )
     vi.stubGlobal('window', { api: { openFile } })
     store().newDocument()
   })
@@ -303,6 +307,21 @@ describe('Öffnen während weiterer Änderungen', () => {
     expect(store().dirty).toBe(true)
   })
 
+  it('importiert eine als ISO-8859-1 kodierte AutoEdit-Datei mit „ä“', async () => {
+    finish = null
+    const xml =
+      '<?xml version="1.0" encoding="ISO-8859-1"?><AUTOMATON><TYPE value="DEA"/>' +
+      '<ALPHABET><ITEM value="ä"/></ALPHABET><STATE name="z" finalstate="true">' +
+      '<TRANSITION target="z"><LABEL read="ä"/></TRANSITION></STATE>' +
+      '<INITIALSTATE value="z"/></AUTOMATON>'
+    const data = Uint8Array.from(xml, (c) => c.charCodeAt(0))
+    const openLatin1: AutomatApi['openFile'] = () => Promise.resolve({ filePath: '/a.xml', data })
+    vi.stubGlobal('window', { api: { openFile: openLatin1 } })
+    await openFile('autoEdit')
+    expect(store().document.alphabet).toEqual(['ä'])
+    expect(store().document.graph.transitions[0].labels).toEqual([{ read: 'ä' }])
+  })
+
   it('meldet einen gescheiterten Import', async () => {
     const pending = openFile('autoEdit')
     await answerWith('<AUTOMATON><TYPE value="TM"/></AUTOMATON>')
@@ -319,7 +338,10 @@ describe('Datei ins Fenster ziehen', () => {
   const dialog = () => useDialogStore.getState()
   const pathForFile = vi.fn<AutomatApi['pathForFile']>()
   const dropped = (name: string, content: string) =>
-    ({ name, text: () => Promise.resolve(content) }) as File
+    ({
+      name,
+      arrayBuffer: () => Promise.resolve(new TextEncoder().encode(content).buffer)
+    }) as File
   const nfa = () => serializeDocument(createEmptyDocument('NFA'))
 
   beforeEach(() => {

@@ -222,7 +222,7 @@ function registerIpcHandlers(): void {
       if (result.canceled || result.filePaths.length === 0) return null
 
       const filePath = result.filePaths[0]
-      return { filePath, content: await readFile(filePath, 'utf-8') }
+      return { filePath, data: await readFile(filePath) }
     }
   )
 
