@@ -32,6 +32,7 @@ import {
 
 export type { AlphabetKind } from '@/model/graph'
 import { clamp, type Point, type Viewport } from '@/utils/geometry'
+import { alphabetOverlap } from '@shared/alphabetRules'
 import { sameTuringCell, setTuringCell, turingCell, type TuringCell } from '@/model/turingTable'
 
 export type Tool = 'select' | 'lasso' | 'state' | 'transition' | 'delete'
@@ -185,9 +186,11 @@ interface EditorState {
   sortAlphabet(kind?: AlphabetKind): void
   /**
    * Ersetzt das Alphabet durch `symbols`. Symbole, die in Übergängen benutzt werden, bleiben
-   * (hinten angehängt) erhalten, damit keine Übergänge kaputtgehen. Liefert diese Symbole.
+   * (hinten angehängt) erhalten, damit keine Übergänge kaputtgehen. Verletzt das Ergebnis die
+   * Alphabetregel („„a“ einzeln und in „ax““), bleibt das Dokument unverändert und das Problem
+   * kommt zurück – sonst `null`.
    */
-  applyAlphabetPreset(symbols: string[], kind?: AlphabetKind): string[]
+  applyAlphabetPreset(symbols: string[], kind?: AlphabetKind): string | null
   /** Kellerautomat: Stack-Startsymbol, Akzeptanz */
   setStackSettings(patch: Partial<Omit<StackSettings, 'alphabet'>>): void
   /** Turingmaschine: Blank */
@@ -541,18 +544,21 @@ export const useEditorStore = create<EditorState>()((set, get) => {
               )
             )
       const kept = alphabetOf(document, kind).filter((s) => used.has(s) && !symbols.includes(s))
-      commit((doc) => {
-        // Das Bandalphabet behält immer Σ und das Blank, das Stackalphabet das Startsymbol
-        const start = kind === 'stack' ? stackSettings(doc).start : null
-        const alphabet =
-          kind === 'tape'
-            ? [...new Set([...doc.alphabet, ...symbols, ...kept, tapeSettings(doc).blank])]
-            : [...new Set([...symbols, ...kept, ...(start === null ? [] : [start])])]
-        if (sameSymbols(alphabet, alphabetOf(doc, kind))) return doc
-        const next = withAlphabet(doc, kind, alphabet)
-        return kind === 'input' ? withInputInTape(next, alphabet) : next
-      })
-      return kept
+      // Das Bandalphabet behält immer Σ und das Blank, das Stackalphabet das Startsymbol
+      const start = kind === 'stack' ? stackSettings(document).start : null
+      const alphabet =
+        kind === 'tape'
+          ? [...new Set([...document.alphabet, ...symbols, ...kept, tapeSettings(document).blank])]
+          : [...new Set([...symbols, ...kept, ...(start === null ? [] : [start])])]
+      if (sameSymbols(alphabet, alphabetOf(document, kind))) return null
+      const withPreset = withAlphabet(document, kind, alphabet)
+      const next = kind === 'input' ? withInputInTape(withPreset, alphabet) : withPreset
+      // Preset und bisheriges Alphabet sind einzeln gültig, die Vereinigung vielleicht nicht
+      const problem =
+        alphabetOverlap(alphabet) ?? (next.tape ? alphabetOverlap(next.tape.alphabet) : null)
+      if (problem) return problem
+      commit(() => next)
+      return null
     },
     setStackSettings: (patch) =>
       commit((doc) => {

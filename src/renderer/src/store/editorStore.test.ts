@@ -81,18 +81,24 @@ describe('sortAlphabet', () => {
 describe('applyAlphabetPreset', () => {
   it('ersetzt das Alphabet durch das Preset', () => {
     store().setDocumentMeta({ alphabet: ['x', 'y'] })
-    const kept = store().applyAlphabetPreset(['0', '1'])
+    expect(store().applyAlphabetPreset(['0', '1'])).toBeNull()
 
     expect(store().document.alphabet).toEqual(['0', '1'])
-    expect(kept).toEqual([])
   })
 
   it('behält Symbole, die in Übergängen benutzt werden', () => {
     setupAB() // Alphabet {a, b}, beide im Übergang benutzt
-    const kept = store().applyAlphabetPreset(['0', '1', 'b'])
+    expect(store().applyAlphabetPreset(['0', '1', 'b'])).toBeNull()
 
     expect(store().document.alphabet).toEqual(['0', '1', 'b', 'a'])
-    expect(kept).toEqual(['a'])
+  })
+
+  it('lässt das Dokument unverändert, wenn die Vereinigung die Alphabetregel verletzt', () => {
+    setupAB()
+    store().renameSymbol('a', 'ax')
+    const before = store().document
+    expect(store().applyAlphabetPreset(['a', 'b'])).toBe('„a“ einzeln und in „ax“')
+    expect(store().document).toBe(before)
   })
 
   it('behält beim Stackalphabet das Startsymbol, auch wenn es unbenutzt ist', () => {
@@ -500,7 +506,7 @@ describe('Ausgabealphabet Δ', () => {
 
   it('Voreinstellung behält benutzte Ausgabesymbole', () => {
     store().loadDocument(structuredClone(moore), null)
-    expect(store().applyAlphabetPreset(['a', 'b'], 'output')).toEqual(['0', '1'])
+    expect(store().applyAlphabetPreset(['a', 'b'], 'output')).toBeNull()
     expect(store().document.output?.alphabet).toEqual(['a', 'b', '0', '1'])
   })
 })

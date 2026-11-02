@@ -145,8 +145,9 @@ export function AlphabetScreen() {
   }
 
   const applyPreset = (preset: AlphabetPreset, kind: AlphabetKind): void => {
-    applyAlphabetPreset(preset.symbols, kind)
-    setSelected(null)
+    const problem = applyAlphabetPreset(preset.symbols, kind)
+    setError(problem)
+    if (!problem) setSelected(null)
   }
 
   const presetEntries = (kind: AlphabetKind): ContextMenuEntry[] =>
