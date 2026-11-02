@@ -194,19 +194,17 @@ export const BLANK = '#'
  */
 const BLANK_SPELLINGS = new Set(['□', '_'])
 
-/** Bandalphabet Γ = Σ ∪ {Blank} – Blank aus den Vorgaben (Standard #) */
 /** Ersatz-Blanks, falls das voreingestellte Blank schon in Σ liegt */
 const SPARE_BLANKS = ['#', '$', '§', '%', '&', '~']
 
-/** Bandangaben zu Σ: Γ = Σ ∪ {Blank}, das Blank nie aus Σ (sonst wäre die Maschine ungültig). */
+/**
+ * Bandangaben zu Σ: Γ = Σ ∪ {Blank}, Blank aus den Vorgaben (Standard #). Das Blank liegt nie
+ * in Σ und überlappt kein Symbol (bei Σ = {#1} nicht #) – sonst wäre die Maschine ungültig.
+ */
 export function createTapeSettings(alphabet: string[] = []): TapeSettings {
-  const taken = new Set(alphabet)
-  const blank = [defaults.blank, ...SPARE_BLANKS].find((s) => !taken.has(s)) ?? freeSymbol(taken)
+  const fits = (s: string): boolean => !alphabet.includes(s) && !overlapProblem(alphabet, s)
+  const blank = [defaults.blank, ...SPARE_BLANKS].find(fits) ?? nextFreeSymbol(alphabet)
   return { alphabet: [...alphabet, blank], blank }
-}
-
-function freeSymbol(taken: Set<string>): string {
-  for (let i = 0; ; i++) if (!taken.has(`#${i}`)) return `#${i}`
 }
 
 /** Bandangaben des Dokuments – bei Dokumenten ohne Band die Voreinstellung. */
