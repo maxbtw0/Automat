@@ -141,4 +141,32 @@ describe('Stackregeln schreiben', () => {
       expect(formatStackWord(push, gamma), text).toBe(text)
     }
   })
+
+  it('Wörter, die verkettet wie ε geschrieben wären, bleiben getrennt', () => {
+    const gamma = ['e', 'p', 's', 'E', 'P', 'S', 'i', 'l', 'o', 'n', '#']
+    const words = [
+      ['e', 'p', 's'],
+      ['E', 'p', 'S'],
+      ['e', 'p', 's', 'i', 'l', 'o', 'n'],
+      ['E', 'P', 'S']
+    ]
+    for (const word of words) {
+      const text = formatStackWord(word, gamma)
+      expect(parseStackWord(text, gamma), text).toEqual(word)
+    }
+    expect(formatStackWord(['e', 'p', 's'], gamma)).toBe('e p s')
+    const doc = pda(gamma)
+    const rule = { read: 'a', pop: '#', push: ['e', 'p', 's'] }
+    expect(parseLabels(formatLabel(rule, gamma), doc)).toEqual({ labels: [rule] })
+  })
+
+  it('Mealy-Ausgabe „e p s“ übersteht Formatieren und erneutes Einlesen', () => {
+    const doc = createEmptyDocument('MEALY')
+    doc.alphabet = ['ab']
+    doc.output = { alphabet: ['e', 'p', 's'] }
+    const rule = { read: 'ab', output: ['e', 'p', 's'] }
+    const text = formatLabelsInline([rule], doc.output.alphabet)
+    expect(text).toBe('ab/e p s')
+    expect(parseLabels(text, doc)).toEqual({ labels: [rule] })
+  })
 })

@@ -72,10 +72,13 @@ const isTuringLabel = (label: TransitionLabel): boolean =>
  *
  * Mit dem Stackalphabet Γ wird auch dann getrennt, wenn die Verkettung beim Zurücklesen
  * (`parseStackWord`) andere Symbole ergäbe – bei Γ = {A, B, AB} wird [A, B] zu „A B“, nicht
- * „AB“. Wer formatiert und wieder einliest, muss Γ deshalb mitgeben.
+ * „AB“. Wer formatiert und wieder einliest, muss Γ deshalb mitgeben. Ergäbe die Verkettung
+ * eine Schreibweise von ε („eps“, „Epsilon“), bleiben die Symbole getrennt („e p s“).
  */
 export function formatStackWord(symbols: string[], stackAlphabet?: string[]): string {
-  return symbols.length === 0 ? EPSILON : joinWord(symbols, stackAlphabet)
+  if (symbols.length === 0) return EPSILON
+  const text = joinWord(symbols, stackAlphabet)
+  return normalizeSymbol(text) === EPSILON ? symbols.join(' ') : text
 }
 
 /** Stackinhalt (oben = letztes Element) wie im Lehrbuch: oberstes Symbol links. */
