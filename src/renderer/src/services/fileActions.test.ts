@@ -333,6 +333,34 @@ describe('Öffnen während weiterer Änderungen', () => {
   })
 })
 
+describe('Öffnen im Browser', () => {
+  const store = () => useEditorStore.getState()
+
+  beforeEach(() => store().newDocument())
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('meldet einen Lesefehler, statt hängen zu bleiben', async () => {
+    const listeners = new Map<string, () => void>()
+    const unreadable = {
+      name: 'nea.json',
+      arrayBuffer: () => Promise.reject(new DOMException('Kein Zugriff', 'NotReadableError'))
+    } as File
+    const input = {
+      files: [unreadable],
+      addEventListener: (type: string, listener: () => void) => listeners.set(type, listener),
+      click: () => listeners.get('change')?.()
+    }
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('HTMLElement', class {})
+    vi.stubGlobal('document', { createElement: () => input, activeElement: null })
+    await openFile()
+    expect(store().status).toEqual({
+      kind: 'error',
+      text: expect.stringContaining('Öffnen fehlgeschlagen')
+    })
+  })
+})
+
 describe('Datei ins Fenster ziehen', () => {
   const store = () => useEditorStore.getState()
   const dialog = () => useDialogStore.getState()

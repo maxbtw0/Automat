@@ -51,13 +51,15 @@ const BROWSER_ACCEPT: Record<OpenFileKind, string> = {
 }
 
 function openFileInBrowser(kind: OpenFileKind): Promise<OpenFileResult | null> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = BROWSER_ACCEPT[kind]
-    input.addEventListener('change', async () => {
+    input.addEventListener('change', () => {
       const file = input.files?.[0]
-      resolve(file ? { filePath: file.name, data: await fileBytes(file) } : null)
+      if (!file) return resolve(null)
+      // Ein Lesefehler (Datei inzwischen weg, kein Zugriff) landet in der Fehlermeldung
+      fileBytes(file).then((data) => resolve({ filePath: file.name, data }), reject)
     })
     input.addEventListener('cancel', () => resolve(null))
     input.click()
