@@ -26,7 +26,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Ein Zeichen darf nicht einzeln und zugleich in einem längeren Symbol im Alphabet stehen',
       'Leerzeichen trennen Symbole im Eingabewort',
       'Reguläre Ausdrücke lehnen „\\ε“ ab, Kellerautomaten melden „ε“ im Push-Wort als Fehler',
-      'NEA-Simulation zeigt die ganze Zustandsmenge, den erklärten Pfad hervorgehoben'
+      'NEA-Simulation zeigt die ganze Zustandsmenge, den erklärten Pfad hervorgehoben',
+      'Eine Bildfolge landet in einem eigenen neuen Ordner und überschreibt nie ältere Bilder',
+      'Lange Tabellen lassen sich als PNG/JPG exportieren (als Bildfolge)',
+      'AutoEdit-Import: Push-Wort „eps“, Band ohne Blank und übereinanderliegende Zustände',
+      'Typwechsel zu Turingmaschine oder Transduktor fragt, bevor ε-Regeln entfallen',
+      'Kellerautomat verwirft Wörter mit Zeichen außerhalb von Σ, statt abzubrechen',
+      'Schnellere NEA-Simulation bei langen ε-Ketten'
     ]
   },
   {
