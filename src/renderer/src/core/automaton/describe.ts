@@ -89,7 +89,8 @@ export function describeStep(
 
 /**
  * Satz zum Ergebnis eines Laufs: „Das Wort „ab“ wird akzeptiert.“ Beim Transduktor mit der
- * Ausgabe (`output` als Text): „Das Wort „ab“ wird in „01“ übersetzt.“
+ * Ausgabe (`output` als Text): „Das Wort „ab“ wird in „01“ übersetzt.“ Ein leeres Eingabefeld
+ * (auch nur Leerzeichen) heißt „das leere Wort ε“ – anders als ein eingegebenes „ε“.
  */
 export function describeOutcome(
   word: string,
@@ -97,12 +98,14 @@ export function describeOutcome(
   abortReason?: string | null,
   output?: string
 ): string {
+  const text = word.trim()
+  const subject = text === '' ? `Das leere Wort ${EPSILON}` : `Das Wort ${quote(text)}`
   if (output !== undefined) {
     if (abortReason) return `${abortReason}, Ausgabe bis dahin ${quote(output)}.`
-    return `Das Wort ${quote(word || EPSILON)} wird in ${quote(output)} übersetzt.`
+    return `${subject} wird in ${quote(output)} übersetzt.`
   }
   if (abortReason) return `${abortReason}.`
-  return `Das Wort ${quote(word || EPSILON)} wird ${accepted ? 'akzeptiert' : 'verworfen'}.`
+  return `${subject} wird ${accepted ? 'akzeptiert' : 'verworfen'}.`
 }
 
 /** Bisherige Ausgabe eines Schritts als Text („ε“, wenn noch nichts ausgegeben ist). */

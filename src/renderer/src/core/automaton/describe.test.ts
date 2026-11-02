@@ -90,7 +90,9 @@ describe('describeStep', () => {
 describe('describeOutcome', () => {
   it('akzeptiert, verworfen, abgebrochen', () => {
     expect(describeOutcome('ab', true)).toBe('Das Wort „ab“ wird akzeptiert.')
-    expect(describeOutcome('', false)).toBe('Das Wort „ε“ wird verworfen.')
+    expect(describeOutcome('', false)).toBe('Das leere Wort ε wird verworfen.')
+    expect(describeOutcome('   ', true)).toBe('Das leere Wort ε wird akzeptiert.')
+    expect(describeOutcome('ε', false)).toBe('Das Wort „ε“ wird verworfen.')
     expect(describeOutcome('a', false, 'Abbruch nach 10.000 Schritten')).toBe(
       'Abbruch nach 10.000 Schritten.'
     )

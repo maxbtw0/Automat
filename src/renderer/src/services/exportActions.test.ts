@@ -335,3 +335,17 @@ describe('Lange Tabellen als Bild', () => {
     expect(planExport('simulationTable', 'png', 'light').pageCount).toBe(1)
   })
 })
+
+describe('Titel der Simulationstabelle', () => {
+  const titleFor = (word: string) => {
+    useScreenStore.setState({ simulationWord: word })
+    return planExport('simulationTable', 'csv', 'light').table?.title
+  }
+
+  it('unterscheidet das leere Wort von einem eingegebenen „ε“', () => {
+    expect(titleFor('')).toBe('Simulation des leeren Worts ε')
+    expect(titleFor('   ')).toBe('Simulation des leeren Worts ε')
+    expect(titleFor('ε')).toBe('Simulation „ε“ · „ε“ nicht in Σ')
+    expect(titleFor('aba')).toBe('Simulation „aba“')
+  })
+})

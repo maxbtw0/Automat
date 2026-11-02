@@ -7,6 +7,7 @@ import {
 } from '@/core/automaton/labels'
 import { getAutomatonDefinition } from '@/core/automaton/registry'
 import type { SimulationStep } from '@/core/automaton/types'
+import { tokenizeWord } from '@/core/automaton/word'
 import {
   compareSymbols,
   findState,
@@ -238,6 +239,20 @@ export function transitionTable(document: AutomatonDocument, sorted: boolean): E
  * Ergebnis unter der Tabelle: „Akzeptiert“, „Verworfen“ oder der Grund des Abbruchs – beim
  * Transduktor die Ausgabe.
  */
+/**
+ * Titel der Simulationstabelle. Das leere Eingabefeld heißt „leeres Wort ε“, Zeichen außerhalb
+ * von Σ werden genannt – sonst sähen „“ und ein eingegebenes „ε“ gleich aus.
+ */
+function simulationTitle(document: AutomatonDocument, word: string): string {
+  const text = word.trim()
+  if (text === '') return 'Simulation des leeren Worts ε'
+  const foreign = [...new Set(tokenizeWord(text, document.alphabet))].filter(
+    (symbol) => !document.alphabet.includes(symbol)
+  )
+  const note = foreign.length > 0 ? ` · ${foreign.map((s) => `„${s}“`).join(', ')} nicht in Σ` : ''
+  return `Simulation „${text}“${note}`
+}
+
 function simulationResult(
   document: AutomatonDocument,
   snapshot: SimulationSnapshot
@@ -268,7 +283,7 @@ export function simulationTable(
     if (i === last && snapshot.outcome) return snapshot.outcome
     return markCurrent && i === snapshot.index ? 'current' : undefined
   })
-  const title = `Simulation „${snapshot.word || 'ε'}“`
+  const title = simulationTitle(document, snapshot.word)
   const result = simulationResult(document, snapshot)
   if (usesOutput(document.type)) {
     const delta = outputSettings(document).alphabet
