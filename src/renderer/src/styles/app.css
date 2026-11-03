@@ -402,44 +402,48 @@ h4 {
   margin-top: 8px;
   color: var(--danger);
 }
-/* Alphabet-Screen beim Kellerautomaten: Σ und Γ nebeneinander */
-.alphabet-columns {
+/* Zwei Tabellen nebeneinander, jede mit eigener Werkzeugleiste (Σ und Γ, Übergänge und Zustände) */
+.split-columns {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 16px 40px;
 }
-.alphabet-section {
+.split-section {
   flex: 1 1 340px;
   max-width: 540px;
+}
+.split-section.is-wide {
+  flex: 2 1 480px;
+  max-width: 700px;
 }
 .table-screen.is-split {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'content';
 }
-.alphabet-body {
+.split-body {
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
-.alphabet-tools {
+.split-tools {
   flex: none;
   width: 44px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
 }
-.alphabet-table {
+.split-table {
   flex: 1;
   min-width: 0;
 }
-.alphabet-setting {
+.split-setting {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: 16px;
 }
-.alphabet-setting .select {
+.split-setting .select {
   width: auto;
 }
 .data-table .is-check {

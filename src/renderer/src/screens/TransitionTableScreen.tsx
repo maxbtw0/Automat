@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ComboInput } from '@/components/common/ComboInput'
 import { CommitInput } from '@/components/common/CommitInput'
+import { StateTable } from '@/components/table/StateTable'
 import { TuringTable } from '@/components/table/TuringTable'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import {
@@ -35,7 +36,10 @@ function tableEntries(graph: EditorGraph, sorted: boolean): TransitionEntry[] {
   return sorted ? sortTransitionEntries(graph, entries) : entries
 }
 
-/** Turingmaschine: Matrix Zustand × Bandsymbol – sonst eine Zeile pro Regel. */
+/**
+ * Turingmaschine: Matrix Zustand × Bandsymbol – sonst eine Zeile pro Regel, rechts daneben die
+ * Zustände mit Start und Ende.
+ */
 export function TransitionTableScreen() {
   const hasTape = useEditorStore((s) => usesTape(s.document.type))
   return hasTape ? <TuringTable /> : <TransitionList />
@@ -317,62 +321,70 @@ function TransitionList() {
   const columns = hasStack ? 6 : mealy || moore ? 5 : 4
 
   return (
-    <div className="table-screen">
-      <nav className="area-tools">
-        <ToolPalette
-          tools={TRANSITION_TABLE_TOOLS}
-          active={sorted ? 'sort' : null}
-          onSelect={handleTool}
-        />
-      </nav>
+    <div className="table-screen is-split">
       <div className="table-screen-content">
-        <h1>Übergangstabelle</h1>
-        <table className="data-table is-wide">
-          <thead>
-            <tr>
-              <th className="is-index">#</th>
-              <th>Zustand</th>
-              {moore && <th>Ausgabe</th>}
-              <th>{hasStack ? 'Eingabe' : 'Symbol'}</th>
-              {mealy && <th>Ausgabe</th>}
-              {hasStack && <th>Top of Stack</th>}
-              {hasStack && <th>Push</th>}
-              <th>Folgezustand</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.length === 0 && (
-              <tr>
-                <td colSpan={columns} className="muted">
-                  noch keine Übergänge
-                </td>
-              </tr>
-            )}
-            {entries.map((entry, index) => {
-              const key = entryKey(entry)
-              return (
-                <tr
-                  // Position statt entryKey: Ändert man eine Zelle und springt per Tab weiter,
-                  // bleibt die Zeile bestehen und das nächste Feld behält den Fokus.
-                  key={index}
-                  className={classNames(key === selectedKey && 'is-selected')}
-                  onClick={() => setSelectedKey(key)}
-                >
-                  <td className="is-index">{index + 1}</td>
-                  <td>{stateInput(entry, 'from', 'Zustand')}</td>
-                  {moore && <td>{outputInput(entry)}</td>}
-                  <td>{symbolInput(entry)}</td>
-                  {mealy && <td>{entry.symbol === null ? null : outputInput(entry)}</td>}
-                  {hasStack && <td>{entry.symbol === null ? null : popInput(entry)}</td>}
-                  {hasStack && <td>{entry.symbol === null ? null : pushInput(entry)}</td>}
-                  <td>{stateInput(entry, 'to', 'Folgezustand')}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <div className="split-columns">
+          <section className="split-section is-wide">
+            <h1>Übergangstabelle</h1>
+            <div className="split-body">
+              <nav className="split-tools" aria-label="Werkzeuge Übergangstabelle">
+                <ToolPalette
+                  tools={TRANSITION_TABLE_TOOLS}
+                  active={sorted ? 'sort' : null}
+                  onSelect={handleTool}
+                />
+              </nav>
+              <div className="split-table">
+                <table className="data-table is-wide">
+                  <thead>
+                    <tr>
+                      <th className="is-index">#</th>
+                      <th>Zustand</th>
+                      {moore && <th>Ausgabe</th>}
+                      <th>{hasStack ? 'Eingabe' : 'Symbol'}</th>
+                      {mealy && <th>Ausgabe</th>}
+                      {hasStack && <th>Top of Stack</th>}
+                      {hasStack && <th>Push</th>}
+                      <th>Folgezustand</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.length === 0 && (
+                      <tr>
+                        <td colSpan={columns} className="muted">
+                          noch keine Übergänge
+                        </td>
+                      </tr>
+                    )}
+                    {entries.map((entry, index) => {
+                      const key = entryKey(entry)
+                      return (
+                        <tr
+                          // Position statt entryKey: Ändert man eine Zelle und springt per Tab
+                          // weiter, bleibt die Zeile bestehen und das nächste Feld den Fokus.
+                          key={index}
+                          className={classNames(key === selectedKey && 'is-selected')}
+                          onClick={() => setSelectedKey(key)}
+                        >
+                          <td className="is-index">{index + 1}</td>
+                          <td>{stateInput(entry, 'from', 'Zustand')}</td>
+                          {moore && <td>{outputInput(entry)}</td>}
+                          <td>{symbolInput(entry)}</td>
+                          {mealy && <td>{entry.symbol === null ? null : outputInput(entry)}</td>}
+                          {hasStack && <td>{entry.symbol === null ? null : popInput(entry)}</td>}
+                          {hasStack && <td>{entry.symbol === null ? null : pushInput(entry)}</td>}
+                          <td>{stateInput(entry, 'to', 'Folgezustand')}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+          <StateTable onError={setError} />
+        </div>
         {error && <p className="table-error">{error}</p>}
-
       </div>
     </div>
   )

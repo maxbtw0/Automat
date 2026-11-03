@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { buildDocument } from '@/core/automaton/testing'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
-import { toggleFinalState } from './stateActions'
+import { deleteStateAsking, toggleFinalState } from './stateActions'
 
 const store = () => useEditorStore.getState()
 const dialog = () => useDialogStore.getState()
@@ -84,5 +84,37 @@ describe('toggleFinalState ohne Rückfrage', () => {
     await toggleFinalState(idOf('q1'))
     expect(dialog().request).toBeNull()
     expect(finals()).toEqual(['q1'])
+  })
+})
+
+describe('deleteStateAsking', () => {
+  const nfa = buildDocument('NFA', ['a'], { start: 'q0' }, [['q0', 'a', 'q1']])
+  const labels = () => store().document.graph.states.map((s) => s.label)
+
+  beforeEach(() => store().loadDocument(structuredClone(nfa), null))
+
+  it('fragt, wenn Übergänge daran hängen, und löscht mit ihnen', async () => {
+    const done = deleteStateAsking(idOf('q1'))
+    expect(dialog().request?.title).toBe('„q1“ löschen?')
+    expect(dialog().request?.detail).toBe('Ein Übergang hängt daran und wird mitgelöscht.')
+    dialog().answer(0)
+    expect(await done).toBe(true)
+    expect(labels()).toEqual(['q0'])
+    expect(store().document.graph.transitions).toEqual([])
+  })
+
+  it('„Abbrechen“ ändert nichts', async () => {
+    const done = deleteStateAsking(idOf('q1'))
+    dialog().answer(1)
+    expect(await done).toBe(false)
+    expect(store().document).toEqual(nfa)
+  })
+
+  it('löscht einen Zustand ohne Übergänge ohne Rückfrage', async () => {
+    store().addState(0, 0)
+    const id = store().document.graph.states[2].id
+    expect(await deleteStateAsking(id)).toBe(true)
+    expect(dialog().request).toBeNull()
+    expect(labels()).toEqual(['q0', 'q1'])
   })
 })

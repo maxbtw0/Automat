@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { CommitInput } from '@/components/common/CommitInput'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
-import { TURING_TABLE_TOOLS, type TuringTableTool } from '@/editor/turingTableTools'
+import { STATE_TABLE_TOOLS, type StateTableTool } from '@/editor/stateTableTools'
 import { nextStatePosition, tapeSettings, type StateId } from '@/model/graph'
 import { turingCell, turingCells, type TuringCell } from '@/model/turingTable'
-import { askChoice } from '@/store/dialogStore'
+import { deleteStateAsking } from '@/services/stateActions'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 import { TuringCellDialog } from './TuringCellDialog'
@@ -47,27 +47,13 @@ export function TuringTable() {
   const handleDelete = async (): Promise<void> => {
     const index = graph.states.findIndex((s) => s.id === selectedId)
     if (index === -1) return setError('Erst einen Zustand in der Tabelle auswählen.')
-    const state = graph.states[index]
-    const count = graph.transitions.filter((t) => t.from === state.id || t.to === state.id).length
-    if (count > 0) {
-      const choice = await askChoice({
-        title: `„${state.label}“ löschen?`,
-        detail:
-          count === 1
-            ? 'Ein Übergang hängt daran und wird mitgelöscht.'
-            : `${count} Übergänge hängen daran und werden mitgelöscht.`,
-        buttons: ['Löschen', 'Abbrechen'],
-        danger: 0
-      })
-      if (choice !== 0) return
-    }
-    store.deleteState(state.id)
+    if (!(await deleteStateAsking(graph.states[index].id))) return
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
     const rest = useEditorStore.getState().document.graph.states
     setSelectedId(rest[Math.min(index, rest.length - 1)]?.id ?? null)
   }
 
-  const handleTool = (tool: TuringTableTool): void => {
+  const handleTool = (tool: StateTableTool): void => {
     setError(null)
     if (tool === 'add') handleAdd()
     else void handleDelete()
@@ -90,7 +76,7 @@ export function TuringTable() {
   return (
     <div className="table-screen">
       <nav className="area-tools">
-        <ToolPalette tools={TURING_TABLE_TOOLS} active={null} onSelect={handleTool} />
+        <ToolPalette tools={STATE_TABLE_TOOLS} active={null} onSelect={handleTool} />
       </nav>
       <div className="table-screen-content">
         <h1>Übergangstabelle</h1>

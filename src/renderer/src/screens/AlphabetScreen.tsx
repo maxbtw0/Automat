@@ -316,18 +316,18 @@ export function AlphabetScreen() {
       {!second && <nav className="area-tools">{tools('input')}</nav>}
       <div className="table-screen-content">
         {second ? (
-          <div className="alphabet-columns">
+          <div className="split-columns">
             {(['input', second] as const).map((k) => (
-              <section key={k} className="alphabet-section">
+              <section key={k} className="split-section">
                 <h1>{TITLES[k]}</h1>
-                <div className="alphabet-body">
-                  <nav className="alphabet-tools" aria-label={`Werkzeuge ${TITLES[k]}`}>
+                <div className="split-body">
+                  <nav className="split-tools" aria-label={`Werkzeuge ${TITLES[k]}`}>
                     {tools(k)}
                   </nav>
-                  <div className="alphabet-table">
+                  <div className="split-table">
                     {table(k)}
                     {k === 'stack' && (
-                      <label className="alphabet-setting">
+                      <label className="split-setting">
                         <span className="field-label">Akzeptanz</span>
                         <select
                           className="select"

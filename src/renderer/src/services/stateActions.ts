@@ -28,3 +28,28 @@ export async function toggleFinalState(id: StateId): Promise<void> {
   if (choice === SWITCH) useEditorStore.getState().toggleFinal(id, 'final')
   else if (choice === KEEP) useEditorStore.getState().toggleFinal(id)
 }
+
+/**
+ * Löscht einen Zustand samt seiner Übergänge. Hängen Übergänge daran, fragt erst ein kleines
+ * Fenster. Liefert `true`, wenn gelöscht wurde.
+ */
+export async function deleteStateAsking(id: StateId): Promise<boolean> {
+  const { graph } = useEditorStore.getState().document
+  const state = findState(graph, id)
+  if (!state) return false
+  const count = graph.transitions.filter((t) => t.from === id || t.to === id).length
+  if (count > 0) {
+    const choice = await askChoice({
+      title: `„${state.label}“ löschen?`,
+      detail:
+        count === 1
+          ? 'Ein Übergang hängt daran und wird mitgelöscht.'
+          : `${count} Übergänge hängen daran und werden mitgelöscht.`,
+      buttons: ['Löschen', 'Abbrechen'],
+      danger: 0
+    })
+    if (choice !== 0) return false
+  }
+  useEditorStore.getState().deleteState(id)
+  return true
+}
