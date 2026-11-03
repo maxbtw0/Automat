@@ -17,12 +17,15 @@ export interface ChangelogEntry {
 /** Neueste Version zuerst. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.1',
+    version: '1.1.0',
     changes: [
-      'Angefangene Eingaben werden vor Neu, Öffnen, Speichern, Export und Schließen übernommen',
-      'Reguläre Ausdrücke trennen Symbole mit mehreren Zeichen durch Leerzeichen',
-      'Der NEA liest ein „ε“ im Eingabewort nicht mehr über einen ε-Übergang',
-      'Export sehr langer Simulationen funktioniert wieder, auch als PDF',
+      'Transduktoren: Mealy- und Moore-Automat mit Ausgabealphabet Δ, Umwandlung Mealy ↔ Moore',
+      'Import aus AutoEdit/AtoCC: DEA, NEA, Kellerautomat und Turingmaschine',
+      'Datei ins Fenster ziehen öffnet sie',
+      'Übergangstabelle: Zustände mit Start und Ende rechts daneben',
+      'Kellerautomat: der erste Endzustand wechselt auf Akzeptanz mit Endzustand',
+      'Speichern schreibt atomar, kein Datenverlust bei Abbruch',
+      'Schnellere Simulation, Regex-Ansicht und Bearbeitung großer Automaten',
       'Ein Zeichen darf nicht einzeln und zugleich in einem längeren Symbol im Alphabet stehen',
       'Leerzeichen trennen Symbole im Eingabewort',
       'Reguläre Ausdrücke lehnen „\\ε“ ab, Kellerautomaten melden „ε“ im Push-Wort als Fehler',
@@ -33,6 +36,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Typwechsel zu Turingmaschine oder Transduktor fragt, bevor ε-Regeln entfallen',
       'Kellerautomat verwirft Wörter mit Zeichen außerhalb von Σ, statt abzubrechen',
       'Schnellere NEA-Simulation bei langen ε-Ketten'
+    ]
+  },
+  {
+    version: '1.0.1',
+    changes: [
+      'Angefangene Eingaben werden vor Neu, Öffnen, Speichern, Export und Schließen übernommen',
+      'Reguläre Ausdrücke trennen Symbole mit mehreren Zeichen durch Leerzeichen',
+      'Der NEA liest ein „ε“ im Eingabewort nicht mehr über einen ε-Übergang',
+      'Export sehr langer Simulationen funktioniert wieder, auch als PDF',
+      'Export: Reiter „Alles“ mit Graph und Tabellen nebeneinander',
+      'Grapheneditor: Auswahlrechteck und Freiform-Lasso für mehrere Elemente',
+      'Taste zum Verschieben der Ansicht in den Einstellungen wählbar',
+      'Hilfe: Reiter „Programm“ mit Version, Changelog und GitHub-Link'
     ]
   },
   {
