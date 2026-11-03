@@ -17,6 +17,9 @@ import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 
 interface StateTableProps {
+  /** Ausgewählte Zustände – darauf wirkt „Löschen“; hält die Übergangstabelle für Entf */
+  selectedIds: StateId[]
+  onSelect: (ids: StateId[]) => void
   /** Fehlermeldung unter den Tabellen – `null` löscht sie */
   onError: (message: string | null) => void
 }
@@ -25,7 +28,7 @@ interface StateTableProps {
  * Zustände neben der Übergangstabelle: Name, Start- und Endzustand (Transduktoren ohne
  * Endzustand), Moore mit Ausgabe λ(z). Eigene Werkzeugleiste wie im Alphabet-Screen.
  */
-export function StateTable({ onError }: StateTableProps) {
+export function StateTable({ selectedIds, onSelect: setSelectedIds, onError }: StateTableProps) {
   const doc = useEditorStore((s) => s.document)
   const { graph } = doc
   const hasFinal = !usesOutput(doc.type)
@@ -33,8 +36,6 @@ export function StateTable({ onError }: StateTableProps) {
   const delta = outputSettings(doc).alphabet
   const store = useEditorStore.getState()
 
-  /** Ausgewählte Zustände – darauf wirkt „Löschen“ */
-  const [selectedIds, setSelectedIds] = useState<StateId[]>([])
   const setSelectedId = (id: StateId | null): void => setSelectedIds(id === null ? [] : [id])
   /** Gerade angelegter Zustand – sein Namensfeld bekommt den Fokus */
   const [justAdded, setJustAdded] = useState<StateId | null>(null)

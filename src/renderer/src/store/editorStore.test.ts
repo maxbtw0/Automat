@@ -242,6 +242,20 @@ describe('Übergangstabelle', () => {
     expect(store().selection).toBeNull()
   })
 
+  it('deleteRows löscht Zeilen und Zustände in einem Undo-Schritt', () => {
+    setupAB()
+    const [from, to] = store().document.graph.states.map((s) => s.id)
+    const extra = store().addState(200, 0)
+    const before = store().document
+
+    store().deleteRows([{ from, symbol: 'a', to }], [extra])
+    expect(store().document.graph.states.map((s) => s.id)).toEqual([from, to])
+    expect(store().document.graph.transitions[0].labels).toEqual([{ read: 'b' }])
+
+    store().undo()
+    expect(store().document).toBe(before)
+  })
+
   it('removeTransitionEntries entfernt mehrere Zeilen in einem Undo-Schritt', () => {
     setupAB()
     const [from, to] = store().document.graph.states.map((s) => s.id)

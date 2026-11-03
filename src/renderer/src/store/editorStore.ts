@@ -237,6 +237,8 @@ interface EditorState {
   removeTransitionEntry(entry: TransitionEntry): void
   /** Mehrere Tabellenzeilen – ein Undo-Schritt */
   removeTransitionEntries(entries: TransitionEntry[]): void
+  /** Tabellenzeilen und Zustände (samt ihrer Übergänge) zusammen – ein Undo-Schritt */
+  deleteRows(entries: TransitionEntry[], stateIds: StateId[]): void
   /**
    * Legt einen Zustand an und ändert die Tabelle im selben Undo-Schritt: `previous` wird durch
    * `next(neueId)` ersetzt – ohne `previous` wird `next(neueId)` nur hinzugefügt.
@@ -692,20 +694,7 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         return acceptance ? { ...next, stack: { ...stackSettings(doc), acceptance } } : next
       }),
     deleteState: (id) => get().deleteStates([id]),
-    deleteStates: (ids) => {
-      const removed = new Set(ids)
-      commit((doc) =>
-        doc.graph.states.some((s) => removed.has(s.id))
-          ? withGraph(doc, {
-              states: doc.graph.states.filter((s) => !removed.has(s.id)),
-              transitions: doc.graph.transitions.filter(
-                (t) => !removed.has(t.from) && !removed.has(t.to)
-              )
-            })
-          : doc
-      )
-      set((s) => ({ selection: validSelection(s.document, s.selection), inlineEdit: null }))
-    },
+    deleteStates: (ids) => get().deleteRows([], ids),
 
     addTransition: (from, to) => {
       const existing = get().document.graph.transitions.find((t) => t.from === from && t.to === to)
@@ -760,9 +749,19 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       set((s) => ({ selection: validSelection(s.document, s.selection) }))
     },
     removeTransitionEntry: (entry) => get().removeTransitionEntries([entry]),
-    removeTransitionEntries: (entries) => {
+    removeTransitionEntries: (entries) => get().deleteRows(entries, []),
+    deleteRows: (entries, stateIds) => {
+      const removed = new Set(stateIds)
       commit((doc) => {
-        const graph = entries.reduce(removeTransitionEntry, doc.graph)
+        const withoutEntries = entries.reduce(removeTransitionEntry, doc.graph)
+        const graph = withoutEntries.states.some((s) => removed.has(s.id))
+          ? {
+              states: withoutEntries.states.filter((s) => !removed.has(s.id)),
+              transitions: withoutEntries.transitions.filter(
+                (t) => !removed.has(t.from) && !removed.has(t.to)
+              )
+            }
+          : withoutEntries
         return graph === doc.graph ? doc : { ...doc, graph }
       })
       set((s) => ({ selection: validSelection(s.document, s.selection), inlineEdit: null }))

@@ -121,6 +121,15 @@ describe('deleteStateAsking', () => {
     expect(store().document).toEqual(nfa)
   })
 
+  it('fragt nicht nach Übergängen, die als Zeilen ohnehin gelöscht werden', async () => {
+    const entry = { from: idOf('q0'), symbol: 'a', to: idOf('q1') }
+    expect(await deleteStatesAsking([idOf('q1')], [entry])).toBe(true)
+    expect(dialog().request).toBeNull()
+    expect(labels()).toEqual(['q0'])
+    store().undo()
+    expect(store().document).toEqual(nfa)
+  })
+
   it('löscht einen Zustand ohne Übergänge ohne Rückfrage', async () => {
     store().addState(0, 0)
     const id = store().document.graph.states[2].id

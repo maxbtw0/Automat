@@ -4,7 +4,7 @@ import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import { STATE_TABLE_TOOLS, type StateTableTool } from '@/editor/stateTableTools'
 import { nextStatePosition, tapeSettings, type StateId } from '@/model/graph'
 import { turingCell, turingCells, type TuringCell } from '@/model/turingTable'
-import { useSelectAllTarget } from '@/services/tableSelection'
+import { useDeleteSelected, useSelectAllTarget } from '@/services/tableSelection'
 import { deleteStatesAsking } from '@/services/stateActions'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
@@ -51,14 +51,20 @@ export function TuringTable() {
     setJustAdded(id)
   }
 
-  const handleDelete = async (): Promise<void> => {
+  /** `report`: ohne Auswahl einen Fehler zeigen (Werkzeug), sonst nichts tun (Entf) */
+  const handleDelete = async (report = true): Promise<void> => {
     const index = graph.states.findIndex((s) => selectedIds.includes(s.id))
-    if (index === -1) return setError('Erst einen Zustand in der Tabelle auswählen.')
+    if (index === -1) return setError(report ? 'Erst einen Zustand in der Tabelle auswählen.' : null)
     if (!(await deleteStatesAsking(selectedIds))) return
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
     const rest = useEditorStore.getState().document.graph.states
     setSelectedId(rest[Math.min(index, rest.length - 1)]?.id ?? null)
   }
+
+  useDeleteSelected(() => {
+    setError(null)
+    void handleDelete(false)
+  })
 
   const handleTool = (tool: StateTableTool): void => {
     setError(null)

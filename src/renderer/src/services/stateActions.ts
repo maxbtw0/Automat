@@ -1,4 +1,11 @@
-import { findState, stackSettings, usesStack, type StateId } from '@/model/graph'
+import {
+  findState,
+  removeTransitionEntry,
+  stackSettings,
+  usesStack,
+  type StateId,
+  type TransitionEntry
+} from '@/model/graph'
 import { askChoice } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 
@@ -37,9 +44,18 @@ export function deleteStateAsking(id: StateId): Promise<boolean> {
   return deleteStatesAsking([id])
 }
 
-/** Wie `deleteStateAsking` für mehrere Zustände – eine Rückfrage, ein Undo-Schritt. */
-export async function deleteStatesAsking(ids: StateId[]): Promise<boolean> {
-  const { graph } = useEditorStore.getState().document
+/**
+ * Wie `deleteStateAsking` für mehrere Zustände – eine Rückfrage, ein Undo-Schritt. `entries`:
+ * Tabellenzeilen, die im selben Schritt verschwinden (zählen nicht als mitgelöscht).
+ */
+export async function deleteStatesAsking(
+  ids: StateId[],
+  entries: TransitionEntry[] = []
+): Promise<boolean> {
+  const graph = entries.reduce(
+    removeTransitionEntry,
+    useEditorStore.getState().document.graph
+  )
   const states = graph.states.filter((s) => ids.includes(s.id))
   if (states.length === 0) return false
   const removed = new Set(states.map((s) => s.id))
@@ -57,6 +73,6 @@ export async function deleteStatesAsking(ids: StateId[]): Promise<boolean> {
     })
     if (choice !== 0) return false
   }
-  useEditorStore.getState().deleteStates([...removed])
+  useEditorStore.getState().deleteRows(entries, [...removed])
   return true
 }

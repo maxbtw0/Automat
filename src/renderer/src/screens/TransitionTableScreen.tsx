@@ -23,9 +23,11 @@ import {
   usesStack,
   usesTape,
   type EditorGraph,
+  type StateId,
   type TransitionEntry
 } from '@/model/graph'
-import { useSelectAllTarget } from '@/services/tableSelection'
+import { deleteStatesAsking } from '@/services/stateActions'
+import { useDeleteSelected, useSelectAllTarget } from '@/services/tableSelection'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
 import { classNames } from '@/utils/dom'
@@ -73,6 +75,8 @@ function TransitionList() {
    */
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const setSelectedKey = (key: string | null): void => setSelectedKeys(key === null ? [] : [key])
+  /** Ausgewählte Zustände der Tabelle daneben */
+  const [selectedStateIds, setSelectedStateIds] = useState<StateId[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const entries = useMemo(() => tableEntries(graph, sorted), [graph, sorted])
@@ -142,6 +146,20 @@ function TransitionList() {
     const neighbour = rest[Math.min(index, rest.length - 1)]
     setSelectedKey(neighbour ? entryKey(neighbour) : null)
   }
+
+  /** Entf: markierte Zeilen und markierte Zustände zusammen, ein Undo-Schritt */
+  const handleDeleteKey = async (): Promise<void> => {
+    setError(null)
+    const stateIds = graph.states.filter((s) => selectedStateIds.includes(s.id)).map((s) => s.id)
+    if (stateIds.length === 0) {
+      if (selected) handleDelete()
+      return
+    }
+    if (!(await deleteStatesAsking(stateIds, selectedEntries))) return
+    setSelectedKeys([])
+    setSelectedStateIds([])
+  }
+  useDeleteSelected(() => void handleDeleteKey())
 
   const handleTool = (tool: TransitionTableTool): void => {
     setError(null)
@@ -380,7 +398,11 @@ function TransitionList() {
               </div>
             </div>
           </section>
-          <StateTable onError={setError} />
+          <StateTable
+            selectedIds={selectedStateIds}
+            onSelect={setSelectedStateIds}
+            onError={setError}
+          />
         </div>
         {error && <p className="table-error">{error}</p>}
       </div>
