@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { buildDocument } from '@/core/automaton/testing'
 import { useDialogStore } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
-import { deleteStateAsking, toggleFinalState } from './stateActions'
+import { deleteStateAsking, deleteStatesAsking, toggleFinalState } from './stateActions'
 
 const store = () => useEditorStore.getState()
 const dialog = () => useDialogStore.getState()
@@ -107,6 +107,17 @@ describe('deleteStateAsking', () => {
     const done = deleteStateAsking(idOf('q1'))
     dialog().answer(1)
     expect(await done).toBe(false)
+    expect(store().document).toEqual(nfa)
+  })
+
+  it('fragt bei mehreren Zuständen einmal und löscht alle in einem Undo-Schritt', async () => {
+    const done = deleteStatesAsking([idOf('q0'), idOf('q1')])
+    expect(dialog().request?.title).toBe('2 Zustände löschen?')
+    expect(dialog().request?.detail).toBe('Ein Übergang hängt daran und wird mitgelöscht.')
+    dialog().answer(0)
+    expect(await done).toBe(true)
+    expect(labels()).toEqual([])
+    store().undo()
     expect(store().document).toEqual(nfa)
   })
 

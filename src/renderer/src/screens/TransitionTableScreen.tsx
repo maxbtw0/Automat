@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ComboInput } from '@/components/common/ComboInput'
 import { CommitInput } from '@/components/common/CommitInput'
 import { StateTable } from '@/components/table/StateTable'
@@ -25,6 +25,7 @@ import {
   type EditorGraph,
   type TransitionEntry
 } from '@/model/graph'
+import { useSelectAllTarget } from '@/services/selectAll'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
 import { classNames } from '@/utils/dom'
@@ -62,16 +63,27 @@ function TransitionList() {
   const {
     addTransitionEntry,
     replaceTransitionEntry,
-    removeTransitionEntry,
+    removeTransitionEntries,
     addStateWithEntry
   } = useEditorStore.getState()
 
-  /** Ausgewählte Zeile (über entryKey) – darauf wirkt „Löschen“, „Neu“ startet bei ihrem Zustand. */
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  /**
+   * Ausgewählte Zeilen (über entryKey) – darauf wirkt „Löschen“, „Neu“ startet beim Zustand der
+   * ersten.
+   */
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const setSelectedKey = (key: string | null): void => setSelectedKeys(key === null ? [] : [key])
   const [error, setError] = useState<string | null>(null)
 
   const entries = useMemo(() => tableEntries(graph, sorted), [graph, sorted])
-  const selected = entries.find((e) => entryKey(e) === selectedKey)
+  const selectedEntries = entries.filter((e) => selectedKeys.includes(entryKey(e)))
+  const selected = selectedEntries[0]
+
+  const areaRef = useRef<HTMLElement>(null)
+  useSelectAllTarget(areaRef, {
+    selectAll: () => setSelectedKeys(entries.map(entryKey)),
+    clear: () => setSelectedKeys([])
+  })
 
   /**
    * Neue Zeile für (Zustand, Symbol[, Stacksymbol]) – beim Kellerautomaten bleibt der Stack
@@ -124,7 +136,7 @@ function TransitionList() {
   const handleDelete = (): void => {
     if (!selected) return setError('Erst eine Zeile in der Tabelle auswählen.')
     const index = entries.indexOf(selected)
-    removeTransitionEntry(selected)
+    removeTransitionEntries(selectedEntries)
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
     const rest = tableEntries(useEditorStore.getState().document.graph, sorted)
     const neighbour = rest[Math.min(index, rest.length - 1)]
@@ -312,7 +324,7 @@ function TransitionList() {
     <div className="table-screen is-split">
       <div className="table-screen-content">
         <div className="split-columns">
-          <section className="split-section is-wide">
+          <section className="split-section is-wide" ref={areaRef}>
             <h1>Übergangstabelle</h1>
             <div className="split-body">
               <nav className="split-tools" aria-label="Werkzeuge Übergangstabelle">
@@ -350,7 +362,7 @@ function TransitionList() {
                           // Position statt entryKey: Ändert man eine Zelle und springt per Tab
                           // weiter, bleibt die Zeile bestehen und das nächste Feld den Fokus.
                           key={index}
-                          className={classNames(key === selectedKey && 'is-selected')}
+                          className={classNames(selectedKeys.includes(key) && 'is-selected')}
                           onClick={() => setSelectedKey(key)}
                         >
                           <td className="is-index">{index + 1}</td>

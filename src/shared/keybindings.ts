@@ -19,6 +19,7 @@ export const KEY_ACTION_IDS = [
   'edit.undo',
   'edit.redo',
   'edit.delete',
+  'edit.selectAll',
   'edit.settings',
   'view.graph',
   'view.alphabet',
@@ -99,6 +100,12 @@ export const KEY_ACTIONS: Record<KeyAction, KeyActionDefinition> = {
     group: 'Bearbeiten',
     scope: 'graph',
     defaults: ['Delete', 'Backspace']
+  },
+  'edit.selectAll': {
+    label: 'Alles auswählen',
+    group: 'Bearbeiten',
+    scope: 'global',
+    defaults: ['Ctrl+A']
   },
   'edit.settings': {
     label: 'Einstellungen',

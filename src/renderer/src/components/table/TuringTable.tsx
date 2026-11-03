@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { CommitInput } from '@/components/common/CommitInput'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import { STATE_TABLE_TOOLS, type StateTableTool } from '@/editor/stateTableTools'
 import { nextStatePosition, tapeSettings, type StateId } from '@/model/graph'
 import { turingCell, turingCells, type TuringCell } from '@/model/turingTable'
-import { deleteStateAsking } from '@/services/stateActions'
+import { useSelectAllTarget } from '@/services/selectAll'
+import { deleteStatesAsking } from '@/services/stateActions'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 import { TuringCellDialog } from './TuringCellDialog'
@@ -25,10 +26,16 @@ export function TuringTable() {
   const symbols = [...tape.alphabet.filter((s) => s !== tape.blank), tape.blank]
   const store = useEditorStore.getState()
 
-  /** Ausgewählter Zustand – darauf wirkt „Löschen“ */
-  const [selectedId, setSelectedId] = useState<StateId | null>(null)
+  /** Ausgewählte Zustände – darauf wirkt „Löschen“ */
+  const [selectedIds, setSelectedIds] = useState<StateId[]>([])
+  const setSelectedId = (id: StateId | null): void => setSelectedIds(id === null ? [] : [id])
   /** Gerade angelegter Zustand – sein Namensfeld bekommt den Fokus */
   const [justAdded, setJustAdded] = useState<StateId | null>(null)
+  const areaRef = useRef<HTMLDivElement>(null)
+  useSelectAllTarget(areaRef, {
+    selectAll: () => setSelectedIds(graph.states.map((s) => s.id)),
+    clear: () => setSelectedIds([])
+  })
   /** Zelle im Fenster */
   const [editing, setEditing] = useState<{ from: StateId; read: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -45,9 +52,9 @@ export function TuringTable() {
   }
 
   const handleDelete = async (): Promise<void> => {
-    const index = graph.states.findIndex((s) => s.id === selectedId)
+    const index = graph.states.findIndex((s) => selectedIds.includes(s.id))
     if (index === -1) return setError('Erst einen Zustand in der Tabelle auswählen.')
-    if (!(await deleteStateAsking(graph.states[index].id))) return
+    if (!(await deleteStatesAsking(selectedIds))) return
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
     const rest = useEditorStore.getState().document.graph.states
     setSelectedId(rest[Math.min(index, rest.length - 1)]?.id ?? null)
@@ -74,7 +81,7 @@ export function TuringTable() {
   const closeDialog = (): void => setEditing(null)
 
   return (
-    <div className="table-screen">
+    <div className="table-screen" ref={areaRef}>
       <nav className="area-tools">
         <ToolPalette tools={STATE_TABLE_TOOLS} active={null} onSelect={handleTool} />
       </nav>
@@ -105,7 +112,7 @@ export function TuringTable() {
             {graph.states.map((state, index) => (
               <tr
                 key={state.id}
-                className={classNames(state.id === selectedId && 'is-selected')}
+                className={classNames(selectedIds.includes(state.id) && 'is-selected')}
                 onClick={() => setSelectedId(state.id)}
               >
                 <td className="is-index">{index + 1}</td>

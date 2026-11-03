@@ -189,6 +189,25 @@ describe('deleteSymbol', () => {
     expect(store().past).toHaveLength(historyLength)
   })
 
+  it('deleteSymbols löscht mehrere Symbole in einem Undo-Schritt', () => {
+    const { transitionId } = setupAB()
+    store().addSymbol()
+    const before = store().document
+    store().deleteSymbols(['a', 'b'])
+
+    expect(store().document.alphabet).toEqual(['c'])
+    expect(store().document.graph.transitions.some((t) => t.id === transitionId)).toBe(false)
+    store().undo()
+    expect(store().document).toBe(before)
+  })
+
+  it('deleteSymbols ohne bekannte Symbole legt keinen Verlaufseintrag an', () => {
+    setupAB()
+    const before = store().document
+    store().deleteSymbols(['x'])
+    expect(store().document).toBe(before)
+  })
+
   it('lässt sich mit undo() rückgängig machen', () => {
     const { transitionId } = setupAB()
     store().deleteSymbol(0)
@@ -221,6 +240,21 @@ describe('Übergangstabelle', () => {
     store().removeTransitionEntry({ from, symbol: 'b', to })
 
     expect(store().selection).toBeNull()
+  })
+
+  it('removeTransitionEntries entfernt mehrere Zeilen in einem Undo-Schritt', () => {
+    setupAB()
+    const [from, to] = store().document.graph.states.map((s) => s.id)
+    const before = store().document
+
+    store().removeTransitionEntries([
+      { from, symbol: 'a', to },
+      { from, symbol: 'b', to }
+    ])
+    expect(store().document.graph.transitions).toEqual([])
+
+    store().undo()
+    expect(store().document).toBe(before)
   })
 })
 
@@ -295,6 +329,13 @@ describe('Stackalphabet Γ', () => {
 
     expect(store().document.stack?.alphabet).toEqual(['#'])
     expect(labels(transitionId)).toBeUndefined()
+  })
+
+  it('deleteSymbols mit dem Startsymbol → Stack startet leer', () => {
+    setupStack()
+    store().deleteSymbols(['#', 'A'], 'stack')
+    expect(store().document.stack?.alphabet).toEqual([])
+    expect(store().document.stack?.start).toBeNull()
   })
 
   it('löscht das Startsymbol → Stack startet leer', () => {
@@ -450,6 +491,32 @@ describe('Mehrfachauswahl', () => {
     expect(pos(p)).toMatchObject({ x: 10, y: 20 })
     expect(pos(q)).toMatchObject({ x: 110, y: 20 })
     expect(pos(r)).toMatchObject({ x: 200, y: 0 })
+  })
+
+  it('selectAll wählt alle Zustände und Übergänge aus', () => {
+    const { p, q, r, pq, qr, pr } = setupThree()
+    store().selectAll()
+    expect(store().selection).toEqual({
+      kind: 'group',
+      stateIds: [p, q, r],
+      transitionIds: [pq, qr, pr]
+    })
+  })
+
+  it('selectAll bei leerem Automaten wählt nichts aus', () => {
+    store().selectAll()
+    expect(store().selection).toBeNull()
+  })
+
+  it('deleteStates löscht mehrere Zustände samt Übergängen in einem Undo-Schritt', () => {
+    const { p, q, r } = setupThree()
+    const before = store().document
+    store().deleteStates([p, r])
+
+    expect(store().document.graph.states.map((s) => s.id)).toEqual([q])
+    expect(store().document.graph.transitions).toEqual([])
+    store().undo()
+    expect(store().document).toBe(before)
   })
 
   it('verkleinert die Gruppe, wenn Elemente verschwinden', () => {

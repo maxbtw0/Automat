@@ -33,14 +33,21 @@ export async function toggleFinalState(id: StateId): Promise<void> {
  * Löscht einen Zustand samt seiner Übergänge. Hängen Übergänge daran, fragt erst ein kleines
  * Fenster. Liefert `true`, wenn gelöscht wurde.
  */
-export async function deleteStateAsking(id: StateId): Promise<boolean> {
+export function deleteStateAsking(id: StateId): Promise<boolean> {
+  return deleteStatesAsking([id])
+}
+
+/** Wie `deleteStateAsking` für mehrere Zustände – eine Rückfrage, ein Undo-Schritt. */
+export async function deleteStatesAsking(ids: StateId[]): Promise<boolean> {
   const { graph } = useEditorStore.getState().document
-  const state = findState(graph, id)
-  if (!state) return false
-  const count = graph.transitions.filter((t) => t.from === id || t.to === id).length
+  const states = graph.states.filter((s) => ids.includes(s.id))
+  if (states.length === 0) return false
+  const removed = new Set(states.map((s) => s.id))
+  const count = graph.transitions.filter((t) => removed.has(t.from) || removed.has(t.to)).length
   if (count > 0) {
     const choice = await askChoice({
-      title: `„${state.label}“ löschen?`,
+      title:
+        states.length === 1 ? `„${states[0].label}“ löschen?` : `${states.length} Zustände löschen?`,
       detail:
         count === 1
           ? 'Ein Übergang hängt daran und wird mitgelöscht.'
@@ -50,6 +57,6 @@ export async function deleteStateAsking(id: StateId): Promise<boolean> {
     })
     if (choice !== 0) return false
   }
-  useEditorStore.getState().deleteState(id)
+  useEditorStore.getState().deleteStates([...removed])
   return true
 }

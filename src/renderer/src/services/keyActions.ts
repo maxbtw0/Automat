@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/store/settingsStore'
 import { isEditableTarget } from '@/utils/dom'
 import { runMenuAction } from './fileActions'
 import { openHelp } from './helpActions'
+import { selectAll } from './selectAll'
 import { openSettings } from './settingsActions'
 import {
   openAlphabetEditor,
@@ -32,7 +33,11 @@ export function keyActionForEvent(e: KeyboardEvent, scope: KeyScope): KeyAction 
   if (!combo) return null
   const action = actionForCombo(useSettingsStore.getState().settings.keybindings, combo, scope)
   if (!action) return null
-  if (isEditableTarget(e.target) && !(KEY_ACTIONS[action].inTextFields && hasModifier(combo))) {
+  if (
+    isEditableTarget(e.target) &&
+    !(KEY_ACTIONS[action].inTextFields && hasModifier(combo)) &&
+    !(action === 'edit.selectAll' && wholeCellSelected(e.target))
+  ) {
     return null
   }
   // Leertaste/Enter auf einem Knopf löst schon dessen Klick aus.
@@ -40,6 +45,16 @@ export function keyActionForEvent(e: KeyboardEvent, scope: KeyScope): KeyAction 
     return null
   }
   return action
+}
+
+/**
+ * Tabellenzelle, deren Text schon ganz markiert ist (wie direkt nach dem Fokus): „Alles
+ * auswählen“ geht dann an die Tabelle statt an das Feld.
+ */
+function wholeCellSelected(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLInputElement) || !target.closest('.data-table')) return false
+  const { selectionStart, selectionEnd, value } = target
+  return selectionStart === 0 && selectionEnd === value.length
 }
 
 /** Führt eine Aktion aus – außer denen der Simulation, die steuert ihr Screen selbst. */
@@ -63,6 +78,8 @@ export function runKeyAction(action: KeyAction): void {
       return store.redo()
     case 'edit.delete':
       return store.deleteSelection()
+    case 'edit.selectAll':
+      return selectAll()
     case 'edit.settings':
       return openSettings()
     case 'view.graph':

@@ -160,6 +160,7 @@ function buildMenu(): void {
         actionItem('Wiederholen', 'redo', 'edit.redo'),
         { type: 'separator' },
         actionItem('Auswahl löschen', 'delete', 'edit.delete'),
+        actionItem('Alles auswählen', 'selectAll', 'edit.selectAll'),
         { type: 'separator' },
         { label: 'Ausschneiden', role: 'cut' },
         { label: 'Kopieren', role: 'copy' },

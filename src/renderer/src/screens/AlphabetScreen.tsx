@@ -20,6 +20,7 @@ import {
   type AutomatonDocument,
   type StackAcceptance
 } from '@/model/graph'
+import { useSelectAllTarget } from '@/services/selectAll'
 import { askChoice } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useSettingsStore } from '@/store/settingsStore'
@@ -40,13 +41,14 @@ const SYMBOL_NAMES: Record<AlphabetKind, string> = {
 const countsStates = (document: AutomatonDocument, kind: AlphabetKind): boolean =>
   kind === 'output' && outputsOnStates(document.type)
 
-/** Anzahl der Übergänge, deren Regeln das Symbol benutzen (Moore-Ausgabe: der Zustände) */
-const usageCount = (document: AutomatonDocument, symbol: string, kind: AlphabetKind): number =>
-  countsStates(document, kind)
-    ? document.graph.states.filter((s) => stateOutput(s).includes(symbol)).length
-    : document.graph.transitions.filter((t) =>
-        t.labels.some((l) => labelSymbols(l, kind).includes(symbol))
-      ).length
+/** Anzahl der Übergänge, deren Regeln eins der Symbole benutzen (Moore-Ausgabe: der Zustände) */
+const usageCount = (document: AutomatonDocument, symbols: string[], kind: AlphabetKind): number => {
+  const uses = (word: string[]): boolean => word.some((s) => symbols.includes(s))
+  return countsStates(document, kind)
+    ? document.graph.states.filter((s) => uses(stateOutput(s))).length
+    : document.graph.transitions.filter((t) => t.labels.some((l) => uses(labelSymbols(l, kind))))
+        .length
+}
 
 const TITLES: Record<AlphabetKind, string> = {
   input: 'Eingabealphabet Σ',
@@ -75,10 +77,13 @@ export function AlphabetScreen() {
         : null
   const stack = stackSettings(document)
   const tape = tapeSettings(document)
-  const { addSymbol, renameSymbol, deleteSymbol, sortAlphabet, applyAlphabetPreset } =
+  const { addSymbol, renameSymbol, deleteSymbols, sortAlphabet, applyAlphabetPreset } =
     useEditorStore.getState()
 
   const screenRef = useRef<HTMLDivElement>(null)
+  /** Bereiche von Σ und dem zweiten Alphabet nebeneinander – ohne zweites gilt der ganze Screen */
+  const inputRef = useRef<HTMLElement>(null)
+  const secondRef = useRef<HTMLElement>(null)
 
   const alphabetOf = (k: AlphabetKind, doc = document): string[] =>
     k === 'input'
@@ -91,11 +96,9 @@ export function AlphabetScreen() {
 
   /** Zuletzt angelegtes Symbol – dessen Eingabefeld bekommt sofort den Fokus. */
   const [justAdded, setJustAdded] = useState<string | null>(null)
-  /** Ausgewähltes Symbol – darauf wirkt „Löschen“. */
-  const [selected, setSelected] = useState<{
-    kind: AlphabetKind
-    symbol: string
-  } | null>(null)
+  /** Ausgewählte Symbole je Alphabet – darauf wirkt „Löschen“. */
+  const [selected, setSelected] = useState<Partial<Record<AlphabetKind, string[]>>>({})
+  const selectedOf = (k: AlphabetKind): string[] => selected[k] ?? []
   const [error, setError] = useState<string | null>(null)
   /** Preset-Menü: Position relativ zum Screen und Alphabet – `null` = geschlossen */
   const [presetMenu, setPresetMenu] = useState<{
@@ -105,40 +108,57 @@ export function AlphabetScreen() {
   } | null>(null)
   const closePresetMenu = useCallback(() => setPresetMenu(null), [])
 
+  /** Ein Symbol auswählen, die übrigen Alphabete verlieren ihre Auswahl. */
   const select = (k: AlphabetKind, symbol: string | null): void =>
-    setSelected(symbol === null ? null : { kind: k, symbol })
+    setSelected(symbol === null ? {} : { [k]: [symbol] })
+
+  const selectAllHandlers = (k: AlphabetKind) => ({
+    selectAll: () => setSelected((prev) => ({ ...prev, [k]: alphabetOf(k) })),
+    clear: () => setSelected((prev) => ({ ...prev, [k]: [] }))
+  })
+  useSelectAllTarget(second ? inputRef : screenRef, selectAllHandlers('input'))
+  useSelectAllTarget(secondRef, second && selectAllHandlers(second))
+
+  /** Warum ein Symbol nicht gelöscht werden kann – `null`, wenn es geht */
+  const keepProblem = (kind: AlphabetKind, symbol: string): string | null => {
+    if (kind !== 'tape') return null
+    if (symbol === tape.blank) return 'Blank kann nicht gelöscht werden'
+    if (document.alphabet.includes(symbol)) return `„${symbol}“ ist in Σ`
+    return null
+  }
 
   const handleDelete = async (kind: AlphabetKind): Promise<void> => {
     const alphabet = alphabetOf(kind)
-    const index = selected?.kind === kind ? alphabet.indexOf(selected.symbol) : -1
-    if (index === -1) {
+    const chosen = alphabet.filter((s) => selectedOf(kind).includes(s))
+    if (chosen.length === 0) {
       setError('Erst ein Symbol in der Tabelle auswählen.')
       return
     }
-    const symbol = alphabet[index]
-    if (kind === 'tape' && symbol === tape.blank) {
-      setError('Blank kann nicht gelöscht werden')
+    // Blank und Σ-Symbole bleiben in Γ, der Rest wird gelöscht
+    const symbols = chosen.filter((s) => !keepProblem(kind, s))
+    if (symbols.length === 0) {
+      setError(keepProblem(kind, chosen[0]))
       return
     }
-    if (kind === 'tape' && document.alphabet.includes(symbol)) {
-      setError(`„${symbol}“ ist in Σ`)
-      return
-    }
-    const count = usageCount(document, symbol, kind)
+    const index = alphabet.indexOf(symbols[0])
+    const count = usageCount(document, symbols, kind)
     if (count > 0) {
       const [one, many] = countsStates(document, kind)
         ? ['einem Zustand', 'Zuständen']
         : ['einem Übergang', 'Übergängen']
       const where = count === 1 ? one : `${count} ${many}`
+      const single = symbols.length === 1
       const choice = await askChoice({
-        title: `„${symbol}“ löschen?`,
-        detail: `Wird in ${where} benutzt und dort ebenfalls entfernt.`,
+        title: single
+          ? `„${symbols[0]}“ löschen?`
+          : `${symbols.length} ${SYMBOL_NAMES[kind]}e löschen?`,
+        detail: `${single ? 'Wird' : 'Werden'} in ${where} benutzt und dort ebenfalls entfernt.`,
         buttons: ['Löschen', 'Abbrechen'],
         danger: 0
       })
       if (choice !== 0) return
     }
-    deleteSymbol(index, kind)
+    deleteSymbols(symbols, kind)
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
     const rest = alphabetOf(kind, useEditorStore.getState().document)
     select(kind, rest[Math.min(index, rest.length - 1)] ?? null)
@@ -147,7 +167,7 @@ export function AlphabetScreen() {
   const applyPreset = (preset: AlphabetPreset, kind: AlphabetKind): void => {
     const problem = applyAlphabetPreset(preset.symbols, kind)
     setError(problem)
-    if (!problem) setSelected(null)
+    if (!problem) setSelected({})
   }
 
   const presetEntries = (kind: AlphabetKind): ContextMenuEntry[] =>
@@ -209,7 +229,12 @@ export function AlphabetScreen() {
     setError(problem)
     if (problem) return false
     renameSymbol(oldSymbol, newSymbol, k)
-    if (selected?.kind === k && selected.symbol === oldSymbol) select(k, newSymbol)
+    if (selectedOf(k).includes(oldSymbol)) {
+      setSelected((prev) => ({
+        ...prev,
+        [k]: selectedOf(k).map((s) => (s === oldSymbol ? newSymbol : s))
+      }))
+    }
     return true
   }
 
@@ -264,9 +289,7 @@ export function AlphabetScreen() {
             // Symbole sind eindeutig, daher als key geeignet.
             <tr
               key={symbol}
-              className={classNames(
-                selected?.kind === k && symbol === selected.symbol && 'is-selected'
-              )}
+              className={classNames(selectedOf(k).includes(symbol) && 'is-selected')}
               onClick={() => select(k, symbol)}
             >
               <td className="is-index">{index + 1}</td>
@@ -275,7 +298,7 @@ export function AlphabetScreen() {
                   className="is-mono"
                   value={symbol}
                   aria-label={`${SYMBOL_NAMES[k]} ${index + 1}`}
-                  autoFocus={symbol === justAdded && selected?.kind === k}
+                  autoFocus={symbol === justAdded && selectedOf(k).includes(symbol)}
                   onFocus={(e) => {
                     select(k, symbol)
                     e.currentTarget.select()
@@ -294,7 +317,7 @@ export function AlphabetScreen() {
                   />
                 </td>
               )}
-              <td className="is-number">{usageCount(document, symbol, k)}</td>
+              <td className="is-number">{usageCount(document, [symbol], k)}</td>
             </tr>
           ))}
         </tbody>
@@ -318,7 +341,11 @@ export function AlphabetScreen() {
         {second ? (
           <div className="split-columns">
             {(['input', second] as const).map((k) => (
-              <section key={k} className="split-section">
+              <section
+                key={k}
+                className="split-section"
+                ref={k === 'input' ? inputRef : secondRef}
+              >
                 <h1>{TITLES[k]}</h1>
                 <div className="split-body">
                   <nav className="split-tools" aria-label={`Werkzeuge ${TITLES[k]}`}>

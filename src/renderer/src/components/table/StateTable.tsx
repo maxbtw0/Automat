@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { CommitInput } from '@/components/common/CommitInput'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import { formatWord, parseWord } from '@/core/automaton/labels'
@@ -11,7 +11,8 @@ import {
   usesOutput,
   type StateId
 } from '@/model/graph'
-import { deleteStateAsking, toggleFinalState } from '@/services/stateActions'
+import { useSelectAllTarget } from '@/services/selectAll'
+import { deleteStatesAsking, toggleFinalState } from '@/services/stateActions'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'
 
@@ -32,10 +33,16 @@ export function StateTable({ onError }: StateTableProps) {
   const delta = outputSettings(doc).alphabet
   const store = useEditorStore.getState()
 
-  /** Ausgewählter Zustand – darauf wirkt „Löschen“ */
-  const [selectedId, setSelectedId] = useState<StateId | null>(null)
+  /** Ausgewählte Zustände – darauf wirkt „Löschen“ */
+  const [selectedIds, setSelectedIds] = useState<StateId[]>([])
+  const setSelectedId = (id: StateId | null): void => setSelectedIds(id === null ? [] : [id])
   /** Gerade angelegter Zustand – sein Namensfeld bekommt den Fokus */
   const [justAdded, setJustAdded] = useState<StateId | null>(null)
+  const areaRef = useRef<HTMLElement>(null)
+  useSelectAllTarget(areaRef, {
+    selectAll: () => setSelectedIds(graph.states.map((s) => s.id)),
+    clear: () => setSelectedIds([])
+  })
 
   const handleAdd = (): void => {
     const { x, y } = nextStatePosition(graph)
@@ -45,9 +52,9 @@ export function StateTable({ onError }: StateTableProps) {
   }
 
   const handleDelete = async (): Promise<void> => {
-    const index = graph.states.findIndex((s) => s.id === selectedId)
+    const index = graph.states.findIndex((s) => selectedIds.includes(s.id))
     if (index === -1) return onError('Erst einen Zustand in der Tabelle auswählen.')
-    if (!(await deleteStateAsking(graph.states[index].id))) return
+    if (!(await deleteStatesAsking(selectedIds))) return
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
     const rest = useEditorStore.getState().document.graph.states
     setSelectedId(rest[Math.min(index, rest.length - 1)]?.id ?? null)
@@ -87,7 +94,7 @@ export function StateTable({ onError }: StateTableProps) {
   const columns = 3 + (moore ? 1 : 0) + (hasFinal ? 1 : 0)
 
   return (
-    <section className="split-section">
+    <section className="split-section" ref={areaRef}>
       <h1>Zustände</h1>
       <div className="split-body">
         <nav className="split-tools" aria-label="Werkzeuge Zustände">
@@ -115,7 +122,7 @@ export function StateTable({ onError }: StateTableProps) {
               {graph.states.map((state, index) => (
                 <tr
                   key={state.id}
-                  className={classNames(state.id === selectedId && 'is-selected')}
+                  className={classNames(selectedIds.includes(state.id) && 'is-selected')}
                   onClick={() => setSelectedId(state.id)}
                 >
                   <td className="is-index">{index + 1}</td>

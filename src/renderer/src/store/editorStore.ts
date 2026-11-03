@@ -157,6 +157,8 @@ interface EditorState {
   // --- UI ---
   setTool(tool: Tool): void
   select(selection: Selection): void
+  /** Alle Zustände und Übergänge als Gruppe */
+  selectAll(): void
   setInlineEdit(edit: InlineEdit): void
   setViewport(viewport: Viewport): void
   resetViewport(): void
@@ -184,6 +186,8 @@ interface EditorState {
    * nur aus den Ausgabewörtern.
    */
   deleteSymbol(index: number, kind?: AlphabetKind): void
+  /** Mehrere Symbole eines Alphabets – ein Undo-Schritt */
+  deleteSymbols(symbols: string[], kind?: AlphabetKind): void
   sortAlphabet(kind?: AlphabetKind): void
   /**
    * Ersetzt das Alphabet durch `symbols`. Symbole, die in Übergängen benutzt werden, bleiben
@@ -214,6 +218,8 @@ interface EditorState {
   /** Kellerautomat: `acceptance` stellt im selben Undo-Schritt die Akzeptanz um. */
   toggleFinal(id: StateId, acceptance?: StackAcceptance): void
   deleteState(id: StateId): void
+  /** Mehrere Zustände samt ihrer Übergänge – ein Undo-Schritt */
+  deleteStates(ids: StateId[]): void
 
   // --- Übergänge ---
   /** Legt einen Übergang an oder liefert den bestehenden zwischen denselben Zuständen. */
@@ -227,6 +233,8 @@ interface EditorState {
   addTransitionEntry(entry: TransitionEntry): void
   replaceTransitionEntry(previous: TransitionEntry, next: TransitionEntry): void
   removeTransitionEntry(entry: TransitionEntry): void
+  /** Mehrere Tabellenzeilen – ein Undo-Schritt */
+  removeTransitionEntries(entries: TransitionEntry[]): void
   /**
    * Legt einen Zustand an und ändert die Tabelle im selben Undo-Schritt: `previous` wird durch
    * `next(neueId)` ersetzt – ohne `previous` wird `next(neueId)` nur hinzugefügt.
@@ -420,6 +428,16 @@ export const useEditorStore = create<EditorState>()((set, get) => {
 
     setTool: (tool) => set({ tool }),
     select: (selection) => set({ selection }),
+    selectAll: () => {
+      const { states, transitions } = get().document.graph
+      set({
+        selection: groupSelection(
+          states.map((s) => s.id),
+          transitions.map((t) => t.id)
+        ),
+        inlineEdit: null
+      })
+    },
     setInlineEdit: (inlineEdit) => set({ inlineEdit }),
     setViewport: (viewport) =>
       set({ viewport: { ...viewport, zoom: clamp(viewport.zoom, MIN_ZOOM, MAX_ZOOM) } }),
@@ -503,24 +521,28 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         }
       }),
     deleteSymbol: (index, kind = 'input') => {
+      const symbol = alphabetOf(get().document, kind)[index]
+      // ungültiger Index → nichts tun
+      get().deleteSymbols(symbol === undefined ? [] : [symbol], kind)
+    },
+    deleteSymbols: (symbols, kind = 'input') => {
       commit((doc) => {
         const alphabet = alphabetOf(doc, kind)
-        const symbol = alphabet[index]
-        if (symbol === undefined) return doc // ungültiger Index → nichts tun
+        const removed = new Set(symbols.filter((s) => alphabet.includes(s)))
+        if (removed.size === 0) return doc
+        const rest = alphabet.filter((s) => !removed.has(s))
         // Turingmaschine: das Symbol bleibt in Γ, die Regeln bleiben also gültig
-        if (kind === 'input' && usesTape(doc.type)) {
-          return withAlphabet(doc, kind, alphabet.filter((_, i) => i !== index))
-        }
+        if (kind === 'input' && usesTape(doc.type)) return withAlphabet(doc, kind, rest)
         if (kind === 'output') {
-          const without = mapOutputs(doc, (word) => word.filter((s) => s !== symbol))
-          return withAlphabet(without, kind, alphabet.filter((_, i) => i !== index))
+          const without = mapOutputs(doc, (word) => word.filter((s) => !removed.has(s)))
+          return withAlphabet(without, kind, rest)
         }
         const without = withoutEmptiedTransitions(
           doc,
-          mapLabels(doc, (l) => (labelSymbols(l, kind).includes(symbol) ? null : l))
+          mapLabels(doc, (l) => (labelSymbols(l, kind).some((s) => removed.has(s)) ? null : l))
         )
-        const result = withAlphabet(without, kind, alphabet.filter((_, i) => i !== index))
-        if (kind === 'stack' && result.stack?.start === symbol) {
+        const result = withAlphabet(without, kind, rest)
+        if (kind === 'stack' && result.stack?.start != null && removed.has(result.stack.start)) {
           return { ...result, stack: { ...result.stack, start: null } }
         }
         return result
@@ -654,12 +676,18 @@ export const useEditorStore = create<EditorState>()((set, get) => {
         })
         return acceptance ? { ...next, stack: { ...stackSettings(doc), acceptance } } : next
       }),
-    deleteState: (id) => {
+    deleteState: (id) => get().deleteStates([id]),
+    deleteStates: (ids) => {
+      const removed = new Set(ids)
       commit((doc) =>
-        withGraph(doc, {
-          states: doc.graph.states.filter((s) => s.id !== id),
-          transitions: doc.graph.transitions.filter((t) => t.from !== id && t.to !== id)
-        })
+        doc.graph.states.some((s) => removed.has(s.id))
+          ? withGraph(doc, {
+              states: doc.graph.states.filter((s) => !removed.has(s.id)),
+              transitions: doc.graph.transitions.filter(
+                (t) => !removed.has(t.from) && !removed.has(t.to)
+              )
+            })
+          : doc
       )
       set((s) => ({ selection: validSelection(s.document, s.selection), inlineEdit: null }))
     },
@@ -716,9 +744,10 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       })
       set((s) => ({ selection: validSelection(s.document, s.selection) }))
     },
-    removeTransitionEntry: (entry) => {
+    removeTransitionEntry: (entry) => get().removeTransitionEntries([entry]),
+    removeTransitionEntries: (entries) => {
       commit((doc) => {
-        const graph = removeTransitionEntry(doc.graph, entry)
+        const graph = entries.reduce(removeTransitionEntry, doc.graph)
         return graph === doc.graph ? doc : { ...doc, graph }
       })
       set((s) => ({ selection: validSelection(s.document, s.selection), inlineEdit: null }))

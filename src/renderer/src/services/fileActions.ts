@@ -10,6 +10,7 @@ import { useScreenStore } from '@/store/screenStore'
 import { commitActiveInput } from '@/utils/dom'
 import { openExportDialog } from './exportActions'
 import { openHelp } from './helpActions'
+import { selectAll } from './selectAll'
 import { createConfiguredDocument, openSettings } from './settingsActions'
 
 /** `true` in Electron, `false` im reinen Browser (Vite-Dev-Server). */
@@ -194,6 +195,9 @@ export function runMenuAction(action: MenuAction): void {
     case 'delete':
       // Wie das Tastenkürzel nur im Grapheneditor – andere Screens haben ihre eigene Auswahl
       if (useScreenStore.getState().screen === 'graph') store.deleteSelection()
+      break
+    case 'selectAll':
+      selectAll()
       break
     case 'export':
       openExportDialog()

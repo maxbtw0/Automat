@@ -30,6 +30,7 @@ export type MenuAction =
   | 'undo'
   | 'redo'
   | 'delete'
+  | 'selectAll'
   | 'export'
   | 'settings'
   | 'help'
