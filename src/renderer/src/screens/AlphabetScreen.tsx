@@ -20,7 +20,7 @@ import {
   type AutomatonDocument,
   type StackAcceptance
 } from '@/model/graph'
-import { useSelectAllTarget } from '@/services/selectAll'
+import { useDeleteSelected, useSelectAllTarget } from '@/services/tableSelection'
 import { askChoice } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
 import { useSettingsStore } from '@/store/settingsStore'
@@ -50,6 +50,31 @@ const usageCount = (document: AutomatonDocument, symbols: string[], kind: Alphab
         .length
 }
 
+/**
+ * Wo Symbole mehrerer Alphabete benutzt werden: „3 Übergängen“, „einem Zustand“ (Moore-Ausgabe)
+ * oder beides – `null`, wenn nirgends.
+ */
+const usageText = (
+  document: AutomatonDocument,
+  groups: { k: AlphabetKind; symbols: string[] }[]
+): string | null => {
+  const uses = (k: AlphabetKind, word: string[]): boolean =>
+    groups.some((g) => g.k === k && word.some((s) => g.symbols.includes(s)))
+  const onStates = groups.filter((g) => countsStates(document, g.k)).map((g) => g.k)
+  const onRules = groups.filter((g) => !countsStates(document, g.k)).map((g) => g.k)
+  const transitions = document.graph.transitions.filter((t) =>
+    t.labels.some((l) => onRules.some((k) => uses(k, labelSymbols(l, k))))
+  ).length
+  const states = document.graph.states.filter((st) =>
+    onStates.some((k) => uses(k, stateOutput(st)))
+  ).length
+  const parts = [
+    transitions === 1 ? 'einem Übergang' : transitions > 1 ? `${transitions} Übergängen` : null,
+    states === 1 ? 'einem Zustand' : states > 1 ? `${states} Zuständen` : null
+  ].filter((part) => part !== null)
+  return parts.length > 0 ? parts.join(' und ') : null
+}
+
 const TITLES: Record<AlphabetKind, string> = {
   input: 'Eingabealphabet Σ',
   stack: 'Stackalphabet Γ',
@@ -77,7 +102,7 @@ export function AlphabetScreen() {
         : null
   const stack = stackSettings(document)
   const tape = tapeSettings(document)
-  const { addSymbol, renameSymbol, deleteSymbols, sortAlphabet, applyAlphabetPreset } =
+  const { addSymbol, renameSymbol, deleteSymbolGroups, sortAlphabet, applyAlphabetPreset } =
     useEditorStore.getState()
 
   const screenRef = useRef<HTMLDivElement>(null)
@@ -127,42 +152,54 @@ export function AlphabetScreen() {
     return null
   }
 
-  const handleDelete = async (kind: AlphabetKind): Promise<void> => {
-    const alphabet = alphabetOf(kind)
-    const chosen = alphabet.filter((s) => selectedOf(kind).includes(s))
+  /**
+   * Löscht die markierten Symbole der Alphabete `kinds` mit einer Rückfrage als ein Undo-Schritt.
+   * `report`: ohne Auswahl einen Fehler zeigen (Werkzeug), sonst nichts tun (Entf).
+   */
+  const handleDelete = async (kinds: AlphabetKind[], report = true): Promise<void> => {
+    const chosen = kinds
+      .map((k) => ({ k, symbols: alphabetOf(k).filter((s) => selectedOf(k).includes(s)) }))
+      .filter((g) => g.symbols.length > 0)
     if (chosen.length === 0) {
-      setError('Erst ein Symbol in der Tabelle auswählen.')
+      if (report) setError('Erst ein Symbol in der Tabelle auswählen.')
       return
     }
     // Blank und Σ-Symbole bleiben in Γ, der Rest wird gelöscht
-    const symbols = chosen.filter((s) => !keepProblem(kind, s))
-    if (symbols.length === 0) {
-      setError(keepProblem(kind, chosen[0]))
+    const groups = chosen
+      .map(({ k, symbols }) => ({ k, symbols: symbols.filter((s) => !keepProblem(k, s)) }))
+      .filter((g) => g.symbols.length > 0)
+    if (groups.length === 0) {
+      setError(keepProblem(chosen[0].k, chosen[0].symbols[0]))
       return
     }
-    const index = alphabet.indexOf(symbols[0])
-    const count = usageCount(document, symbols, kind)
-    if (count > 0) {
-      const [one, many] = countsStates(document, kind)
-        ? ['einem Zustand', 'Zuständen']
-        : ['einem Übergang', 'Übergängen']
-      const where = count === 1 ? one : `${count} ${many}`
-      const single = symbols.length === 1
+    const all = groups.flatMap((g) => g.symbols)
+    const where = usageText(document, groups)
+    if (where) {
+      const single = all.length === 1
+      const names = groups.length === 1 ? `${SYMBOL_NAMES[groups[0].k]}e` : 'Symbole'
       const choice = await askChoice({
-        title: single
-          ? `„${symbols[0]}“ löschen?`
-          : `${symbols.length} ${SYMBOL_NAMES[kind]}e löschen?`,
+        title: single ? `„${all[0]}“ löschen?` : `${all.length} ${names} löschen?`,
         detail: `${single ? 'Wird' : 'Werden'} in ${where} benutzt und dort ebenfalls entfernt.`,
         buttons: ['Löschen', 'Abbrechen'],
         danger: 0
       })
       if (choice !== 0) return
     }
-    deleteSymbols(symbols, kind)
+    deleteSymbolGroups(Object.fromEntries(groups.map((g) => [g.k, g.symbols])))
+    if (groups.length > 1) {
+      setSelected({})
+      return
+    }
     // Auswahl auf den Nachbarn setzen, damit man mehrfach hintereinander löschen kann.
-    const rest = alphabetOf(kind, useEditorStore.getState().document)
-    select(kind, rest[Math.min(index, rest.length - 1)] ?? null)
+    const [{ k, symbols }] = groups
+    const index = alphabetOf(k).indexOf(symbols[0])
+    const rest = alphabetOf(k, useEditorStore.getState().document)
+    select(k, rest[Math.min(index, rest.length - 1)] ?? null)
   }
+  useDeleteSelected(() => {
+    setError(null)
+    void handleDelete(second ? ['input', second] : ['input'], false)
+  })
 
   const applyPreset = (preset: AlphabetPreset, kind: AlphabetKind): void => {
     const problem = applyAlphabetPreset(preset.symbols, kind)
@@ -200,7 +237,7 @@ export function AlphabetScreen() {
         break
       }
       case 'delete':
-        void handleDelete(kind)
+        void handleDelete([kind])
         break
       case 'sort':
         sortAlphabet(kind)

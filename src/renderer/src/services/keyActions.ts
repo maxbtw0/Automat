@@ -7,7 +7,7 @@ import { useSettingsStore } from '@/store/settingsStore'
 import { isEditableTarget } from '@/utils/dom'
 import { runMenuAction } from './fileActions'
 import { openHelp } from './helpActions'
-import { selectAll } from './selectAll'
+import { deleteSelected, selectAll } from './tableSelection'
 import { openSettings } from './settingsActions'
 import {
   openAlphabetEditor,
@@ -77,7 +77,7 @@ export function runKeyAction(action: KeyAction): void {
     case 'edit.redo':
       return store.redo()
     case 'edit.delete':
-      return store.deleteSelection()
+      return deleteSelected()
     case 'edit.selectAll':
       return selectAll()
     case 'edit.settings':

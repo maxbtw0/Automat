@@ -331,6 +331,18 @@ describe('Stackalphabet Γ', () => {
     expect(labels(transitionId)).toBeUndefined()
   })
 
+  it('deleteSymbolGroups löscht aus Σ und Γ in einem Undo-Schritt', () => {
+    const { transitionId } = setupStack()
+    const before = store().document
+    store().deleteSymbolGroups({ input: ['a'], stack: ['A'] })
+
+    expect(store().document.alphabet).not.toContain('a')
+    expect(store().document.stack?.alphabet).toEqual(['#'])
+    expect(labels(transitionId)).toBeUndefined()
+    store().undo()
+    expect(store().document).toBe(before)
+  })
+
   it('deleteSymbols mit dem Startsymbol → Stack startet leer', () => {
     setupStack()
     store().deleteSymbols(['#', 'A'], 'stack')

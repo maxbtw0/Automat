@@ -25,7 +25,7 @@ import {
   type EditorGraph,
   type TransitionEntry
 } from '@/model/graph'
-import { useSelectAllTarget } from '@/services/selectAll'
+import { useSelectAllTarget } from '@/services/tableSelection'
 import { useEditorStore } from '@/store/editorStore'
 import { useScreenStore } from '@/store/screenStore'
 import { classNames } from '@/utils/dom'

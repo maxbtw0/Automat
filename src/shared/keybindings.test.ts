@@ -94,7 +94,7 @@ describe('Tastenkürzel', () => {
     expect(actionForCombo(bindings, 'S', 'graph')).toBe('tool.state')
     expect(actionForCombo(bindings, 'S', 'simulation')).toBeNull()
     expect(actionForCombo(bindings, 'Space', 'simulation')).toBe('sim.togglePlay')
-    expect(actionForCombo(bindings, 'Delete', 'global')).toBeNull()
+    expect(actionForCombo(bindings, 'V', 'global')).toBeNull()
   })
 
   it('übernimmt gültige Belegungen aus der Datei und ergänzt fehlende', () => {

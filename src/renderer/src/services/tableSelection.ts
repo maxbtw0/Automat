@@ -76,6 +76,30 @@ export function selectAllInTables(): void {
   }
 }
 
+/** Löscht die markierten Zeilen eines Tabellen-Screens – `null` = keiner angemeldet */
+let deleteHandler: (() => void) | null = null
+
+/** Meldet „Auswahl löschen“ (Entf) für den Screen an, solange die Komponente lebt. */
+export function useDeleteSelected(handler: () => void): void {
+  const latest = useRef(handler)
+  useEffect(() => {
+    latest.current = handler
+  })
+  useEffect(() => {
+    const run = (): void => latest.current()
+    deleteHandler = run
+    return () => {
+      if (deleteHandler === run) deleteHandler = null
+    }
+  }, [])
+}
+
+/** „Auswahl löschen“: im Grapheneditor die Auswahl, im Alphabet die markierten Zeilen. */
+export function deleteSelected(): void {
+  if (useScreenStore.getState().screen === 'graph') useEditorStore.getState().deleteSelection()
+  else deleteHandler?.()
+}
+
 /**
  * „Alles auswählen“: im Grapheneditor alle Zustände und Übergänge, auf den Tabellen-Screens
  * alle Zeilen. Simulation und reguläre Ausdrücke haben nichts auszuwählen.

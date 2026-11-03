@@ -98,7 +98,7 @@ export const KEY_ACTIONS: Record<KeyAction, KeyActionDefinition> = {
   'edit.delete': {
     label: 'Auswahl löschen',
     group: 'Bearbeiten',
-    scope: 'graph',
+    scope: 'global',
     defaults: ['Delete', 'Backspace']
   },
   'edit.selectAll': {

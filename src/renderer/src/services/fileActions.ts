@@ -6,11 +6,10 @@ import { importAutoEdit, looksLikeXml } from '@/model/autoEdit'
 import { deserializeDocument, serializeDocument } from '@/model/serialization'
 import { askChoice, isModalOpen } from '@/store/dialogStore'
 import { useEditorStore } from '@/store/editorStore'
-import { useScreenStore } from '@/store/screenStore'
 import { commitActiveInput } from '@/utils/dom'
 import { openExportDialog } from './exportActions'
 import { openHelp } from './helpActions'
-import { selectAll } from './selectAll'
+import { deleteSelected, selectAll } from './tableSelection'
 import { createConfiguredDocument, openSettings } from './settingsActions'
 
 /** `true` in Electron, `false` im reinen Browser (Vite-Dev-Server). */
@@ -193,8 +192,7 @@ export function runMenuAction(action: MenuAction): void {
       store.redo()
       break
     case 'delete':
-      // Wie das Tastenkürzel nur im Grapheneditor – andere Screens haben ihre eigene Auswahl
-      if (useScreenStore.getState().screen === 'graph') store.deleteSelection()
+      deleteSelected()
       break
     case 'selectAll':
       selectAll()

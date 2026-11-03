@@ -11,7 +11,7 @@ import {
   usesOutput,
   type StateId
 } from '@/model/graph'
-import { useSelectAllTarget } from '@/services/selectAll'
+import { useSelectAllTarget } from '@/services/tableSelection'
 import { deleteStatesAsking, toggleFinalState } from '@/services/stateActions'
 import { useEditorStore } from '@/store/editorStore'
 import { classNames } from '@/utils/dom'

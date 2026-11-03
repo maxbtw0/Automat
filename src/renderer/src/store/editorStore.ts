@@ -188,6 +188,8 @@ interface EditorState {
   deleteSymbol(index: number, kind?: AlphabetKind): void
   /** Mehrere Symbole eines Alphabets – ein Undo-Schritt */
   deleteSymbols(symbols: string[], kind?: AlphabetKind): void
+  /** Symbole aus mehreren Alphabeten (Σ und Γ) – ein Undo-Schritt */
+  deleteSymbolGroups(groups: Partial<Record<AlphabetKind, string[]>>): void
   sortAlphabet(kind?: AlphabetKind): void
   /**
    * Ersetzt das Alphabet durch `symbols`. Symbole, die in Übergängen benutzt werden, bleiben
@@ -351,6 +353,33 @@ const withoutEmptiedTransitions = (
   return transitions.length === after.graph.transitions.length
     ? after
     : withGraph(after, { transitions })
+}
+
+/** Nimmt Symbole aus einem Alphabet und aus allen Regeln bzw. Ausgaben, die sie benutzen. */
+function withoutSymbols(
+  doc: AutomatonDocument,
+  symbols: string[],
+  kind: AlphabetKind
+): AutomatonDocument {
+  const alphabet = alphabetOf(doc, kind)
+  const removed = new Set(symbols.filter((s) => alphabet.includes(s)))
+  if (removed.size === 0) return doc
+  const rest = alphabet.filter((s) => !removed.has(s))
+  // Turingmaschine: das Symbol bleibt in Γ, die Regeln bleiben also gültig
+  if (kind === 'input' && usesTape(doc.type)) return withAlphabet(doc, kind, rest)
+  if (kind === 'output') {
+    const without = mapOutputs(doc, (word) => word.filter((s) => !removed.has(s)))
+    return withAlphabet(without, kind, rest)
+  }
+  const without = withoutEmptiedTransitions(
+    doc,
+    mapLabels(doc, (l) => (labelSymbols(l, kind).some((s) => removed.has(s)) ? null : l))
+  )
+  const result = withAlphabet(without, kind, rest)
+  if (kind === 'stack' && result.stack?.start != null && removed.has(result.stack.start)) {
+    return { ...result, stack: { ...result.stack, start: null } }
+  }
+  return result
 }
 
 function validSelection(doc: AutomatonDocument, selection: Selection): Selection {
@@ -525,28 +554,14 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       // ungültiger Index → nichts tun
       get().deleteSymbols(symbol === undefined ? [] : [symbol], kind)
     },
-    deleteSymbols: (symbols, kind = 'input') => {
-      commit((doc) => {
-        const alphabet = alphabetOf(doc, kind)
-        const removed = new Set(symbols.filter((s) => alphabet.includes(s)))
-        if (removed.size === 0) return doc
-        const rest = alphabet.filter((s) => !removed.has(s))
-        // Turingmaschine: das Symbol bleibt in Γ, die Regeln bleiben also gültig
-        if (kind === 'input' && usesTape(doc.type)) return withAlphabet(doc, kind, rest)
-        if (kind === 'output') {
-          const without = mapOutputs(doc, (word) => word.filter((s) => !removed.has(s)))
-          return withAlphabet(without, kind, rest)
-        }
-        const without = withoutEmptiedTransitions(
-          doc,
-          mapLabels(doc, (l) => (labelSymbols(l, kind).some((s) => removed.has(s)) ? null : l))
+    deleteSymbols: (symbols, kind = 'input') => get().deleteSymbolGroups({ [kind]: symbols }),
+    deleteSymbolGroups: (groups) => {
+      commit((doc) =>
+        Object.entries(groups).reduce(
+          (next, [kind, symbols]) => withoutSymbols(next, symbols, kind as AlphabetKind),
+          doc
         )
-        const result = withAlphabet(without, kind, rest)
-        if (kind === 'stack' && result.stack?.start != null && removed.has(result.stack.start)) {
-          return { ...result, stack: { ...result.stack, start: null } }
-        }
-        return result
-      })
+      )
       set((s) => ({ selection: validSelection(s.document, s.selection) }))
     },
     sortAlphabet: (kind = 'input') =>
