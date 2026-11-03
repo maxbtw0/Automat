@@ -20,7 +20,6 @@ import {
   normalizeSymbol,
   listTransitionEntries,
   sortTransitionEntries,
-  stateOutput,
   usesStack,
   usesTape,
   type EditorGraph,
@@ -54,9 +53,8 @@ function TransitionList() {
   /** Kellerautomat: zusätzliche Spalten Stacksymbol (pop) und Push */
   const hasStack = usesStack(type)
   const gamma = hasStack ? (stackAlphabet ?? []) : []
-  /** Mealy: Spalte Ausgabe der Regel; Moore: Spalte Ausgabe des Zustands */
+  /** Mealy: Spalte Ausgabe der Regel (Moore: Ausgabe am Zustand, in der Zustandstabelle) */
   const mealy = type === 'MEALY'
-  const moore = type === 'MOORE'
   const delta = outputAlphabet ?? []
   const allowsEpsilon = getAutomatonDefinition(type).epsilon
   const symbolOptions = allowsEpsilon ? [...alphabet, EPSILON] : alphabet
@@ -65,8 +63,7 @@ function TransitionList() {
     addTransitionEntry,
     replaceTransitionEntry,
     removeTransitionEntry,
-    addStateWithEntry,
-    updateState
+    addStateWithEntry
   } = useEditorStore.getState()
 
   /** Ausgewählte Zeile (über entryKey) – darauf wirkt „Löschen“, „Neu“ startet bei ihrem Zustand. */
@@ -192,7 +189,7 @@ function TransitionList() {
     return true
   }
 
-  /** Ausgabewort aus Δ*, leer = ε – Mealy an der Regel, Moore am Zustand der Zeile */
+  /** Mealy: Ausgabewort der Regel aus Δ*, leer = ε */
   const handleOutputCommit = (entry: TransitionEntry, input: string): boolean => {
     const output = parseWord(input, delta)
     const unknown = output.find((s) => !delta.includes(s))
@@ -200,12 +197,7 @@ function TransitionList() {
       setError(`„${unknown}“ nicht im Ausgabealphabet`)
       return false
     }
-    if (moore) {
-      setError(null)
-      updateState(entry.from, { output })
-    } else {
-      handleChange(entry, { output })
-    }
+    handleChange(entry, { output })
     return true
   }
 
@@ -304,21 +296,17 @@ function TransitionList() {
     />
   )
 
-  const outputInput = (entry: TransitionEntry) => {
-    const state = graph.states.find((s) => s.id === entry.from)
-    const output = moore ? (state ? stateOutput(state) : []) : (entry.output ?? [])
-    return (
-      <CommitInput
-        className="is-mono"
-        aria-label="Ausgabe"
-        value={formatWord(output, delta)}
-        onFocus={focusRow(entry)}
-        onCommit={(value) => handleOutputCommit(entry, value)}
-      />
-    )
-  }
+  const outputInput = (entry: TransitionEntry) => (
+    <CommitInput
+      className="is-mono"
+      aria-label="Ausgabe"
+      value={formatWord(entry.output ?? [], delta)}
+      onFocus={focusRow(entry)}
+      onCommit={(value) => handleOutputCommit(entry, value)}
+    />
+  )
 
-  const columns = hasStack ? 6 : mealy || moore ? 5 : 4
+  const columns = hasStack ? 6 : mealy ? 5 : 4
 
   return (
     <div className="table-screen is-split">
@@ -340,7 +328,6 @@ function TransitionList() {
                     <tr>
                       <th className="is-index">#</th>
                       <th>Zustand</th>
-                      {moore && <th>Ausgabe</th>}
                       <th>{hasStack ? 'Eingabe' : 'Symbol'}</th>
                       {mealy && <th>Ausgabe</th>}
                       {hasStack && <th>Top of Stack</th>}
@@ -368,7 +355,6 @@ function TransitionList() {
                         >
                           <td className="is-index">{index + 1}</td>
                           <td>{stateInput(entry, 'from', 'Zustand')}</td>
-                          {moore && <td>{outputInput(entry)}</td>}
                           <td>{symbolInput(entry)}</td>
                           {mealy && <td>{entry.symbol === null ? null : outputInput(entry)}</td>}
                           {hasStack && <td>{entry.symbol === null ? null : popInput(entry)}</td>}
