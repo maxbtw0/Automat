@@ -102,6 +102,32 @@ export function stateText(state: StateNode, document: AutomatonDocument): string
 }
 
 /**
+ * Gegenstück zu `stateText`: „q0/1“ → Name und Ausgabe. Auch der Name darf „/“ enthalten
+ * („q/AB/1“), getrennt wird deshalb am letzten „/“, hinter dem nur Symbole aus Δ (oder ε) stehen,
+ * sonst am ersten. Ohne „/“ fehlt `output` – die Ausgabe bleibt dann, wie sie ist.
+ */
+export function parseStateText(
+  text: string,
+  document: AutomatonDocument
+): { label: string; output?: string[] } {
+  const slashes: number[] = []
+  if (outputsOnStates(document.type)) {
+    for (let i = text.indexOf('/'); i !== -1; i = text.indexOf('/', i + 1)) slashes.push(i)
+  }
+  if (slashes.length === 0) return { label: text.trim() }
+  const delta = outputSettings(document).alphabet
+  const outputAfter = (slash: number): string[] => parseWord(text.slice(slash + 1), delta)
+  let at = slashes[0]
+  for (let k = slashes.length - 1; k >= 0; k--) {
+    if (outputAfter(slashes[k]).every((symbol) => delta.includes(symbol))) {
+      at = slashes[k]
+      break
+    }
+  }
+  return { label: text.slice(0, at).trim(), output: outputAfter(at) }
+}
+
+/**
  * Alphabet, mit dem Wörter auf der rechten Seite einer Regel formatiert werden: Γ beim
  * Kellerautomaten (Push), Δ beim Mealy-Automaten (Ausgabe).
  */

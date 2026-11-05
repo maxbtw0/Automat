@@ -3,7 +3,6 @@ import {
   findState,
   findTransition,
   endsWithoutFinal,
-  outputSettings,
   outputsOnStates,
   usesOutput,
   usesStack,
@@ -41,7 +40,7 @@ import {
   formatLabelsInline,
   labelWordAlphabet,
   parseLabels,
-  parseWord,
+  parseStateText,
   stateText
 } from '@/core/automaton/labels'
 import { InlineEditor } from './InlineEditor'
@@ -601,12 +600,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           placeholder={moore ? 'q0/1' : 'Bezeichnung'}
           onCancel={close}
           onCommit={(value) => {
-            const slash = moore ? value.indexOf('/') : -1
-            const label = (slash === -1 ? value : value.slice(0, slash)).trim() || state.label
-            const output =
-              slash === -1
-                ? state.output
-                : parseWord(value.slice(slash + 1), outputSettings(doc).alphabet)
+            const parsed = parseStateText(value, doc)
+            const label = parsed.label || state.label
+            const output = parsed.output ?? state.output
             if (stateText({ ...state, label, output }, doc) !== stateText(state, doc)) {
               store.updateState(state.id, moore ? { label, output } : { label })
             }

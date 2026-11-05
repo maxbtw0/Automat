@@ -8,7 +8,9 @@ import {
   labelLines,
   parseLabels,
   parseStackWord,
-  pushSuggestions
+  parseStateText,
+  pushSuggestions,
+  stateText
 } from './labels'
 
 const pda = (gamma: string[] = ['A', '#']) => {
@@ -168,5 +170,34 @@ describe('Stackregeln schreiben', () => {
     const text = formatLabelsInline([rule], doc.output.alphabet)
     expect(text).toBe('ab/e p s')
     expect(parseLabels(text, doc)).toEqual({ labels: [rule] })
+  })
+})
+
+describe('Moore-Zustand als Text', () => {
+  const moore = () => {
+    const doc = createEmptyDocument('MOORE')
+    doc.output = { alphabet: ['AB', '1'] }
+    return doc
+  }
+
+  it('trennt Name und Ausgabe am Schrägstrich', () => {
+    expect(parseStateText('q0/1', moore())).toEqual({ label: 'q0', output: ['1'] })
+    expect(parseStateText('q0/ε', moore())).toEqual({ label: 'q0', output: [] })
+    expect(parseStateText('q0', moore())).toEqual({ label: 'q0' })
+  })
+
+  it('liest einen Namen mit Schrägstrich unverändert zurück', () => {
+    const doc = moore()
+    const state = { id: 's', label: 'q/AB', x: 0, y: 0, isStart: false, isFinal: false, output: ['1'] }
+    expect(stateText(state, doc)).toBe('q/AB/1')
+    expect(parseStateText(stateText(state, doc), doc)).toEqual({ label: 'q/AB', output: ['1'] })
+  })
+
+  it('trennt bei fremden Symbolen hinter jedem Schrägstrich am ersten', () => {
+    expect(parseStateText('q/x/y', moore())).toEqual({ label: 'q', output: ['x', '/', 'y'] })
+  })
+
+  it('ohne Moore ist der ganze Text der Name', () => {
+    expect(parseStateText('q/1', createEmptyDocument('DFA'))).toEqual({ label: 'q/1' })
   })
 })
