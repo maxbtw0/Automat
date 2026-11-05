@@ -15,8 +15,10 @@ import {
   defaultExportArea,
   forEachLimited,
   planExport,
+  MAX_TAPE_CELLS,
   runExport,
-  tapeRangeOf
+  tapeRangeOf,
+  tapeWindow
 } from './exportActions'
 
 /** Rastern braucht einen echten Browser – hier zählt nur, wie viele gleichzeitig laufen */
@@ -312,6 +314,37 @@ describe('Bandausschnitt der Turingmaschine', () => {
       expect(tapeRangeOf(counted), word).toEqual(bruteForce(steps))
       expect(built, word).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('Bandausschnitt pro Bild', () => {
+  it('zeigt kurze Bänder ganz, lange nur um den Kopf', () => {
+    expect(tapeWindow({ from: -1, to: 5 }, 3)).toEqual({ from: -1, to: 5 })
+    const range = { from: -1, to: 400 }
+    expect(tapeWindow(range, 0)).toEqual({ from: -1, to: MAX_TAPE_CELLS - 2 })
+    expect(tapeWindow(range, 200)).toEqual({ from: 185, to: 215 })
+    expect(tapeWindow(range, 400)).toEqual({ from: 400 - MAX_TAPE_CELLS + 1, to: 400 })
+  })
+
+  it('Seiten der Bildfolge wachsen nicht mit der Lauflänge', () => {
+    const right = buildDocument('TM', ['a'], { start: 'q0', finals: [] }, [
+      ['q0', '# → #, R', 'q0']
+    ])
+    useEditorStore.getState().loadDocument(right, null)
+    useScreenStore.setState({ simulationWord: '' })
+    const sizes = (limit: number): number[] => {
+      setSimulationLimits({ ...DEFAULT_SIMULATION, tmStepLimit: limit })
+      try {
+        const plan = planExport('simulationGraph', 'pdf', 'light')
+        return [plan.page(0).svg.length, plan.page(plan.pageCount - 1).svg.length]
+      } finally {
+        setSimulationLimits(DEFAULT_SIMULATION)
+      }
+    }
+    const [shortFirst, shortLast] = sizes(100)
+    const [longFirst, longLast] = sizes(2000)
+    expect(longFirst).toBeLessThan(shortFirst * 1.1)
+    expect(longLast).toBeLessThan(shortLast * 1.1)
   })
 })
 

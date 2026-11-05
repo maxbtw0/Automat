@@ -588,14 +588,25 @@ export function tapeFigureSvg(
     blank,
     state = '',
     from = Math.min(tape.start, head),
-    to = Math.max(tape.start + tape.symbols.length - 1, head)
-  }: { palette?: Palette; blank: string; state?: string; from?: number; to?: number }
+    to = Math.max(tape.start + tape.symbols.length - 1, head),
+    alphabet
+  }: {
+    palette?: Palette
+    blank: string
+    state?: string
+    from?: number
+    to?: number
+    /** Bandalphabet Γ für die Zellbreite – sonst zählen die Symbole im Ausschnitt */
+    alphabet?: string[]
+  }
 ): SvgImage {
   const P = palette
-  const cellWidth = Math.max(
-    TAPE_CELL,
-    ...[...tape.symbols, blank].map((s) => measureText(s, MONO, 15) + 2 * CELL_PAD)
-  )
+  const read = (p: number): string => tape.symbols[p - tape.start] ?? blank
+  const shown = alphabet ?? Array.from({ length: to - from + 1 }, (_, i) => read(from + i))
+  let cellWidth = TAPE_CELL
+  for (const s of [...shown, blank]) {
+    cellWidth = Math.max(cellWidth, measureText(s, MONO, 15) + 2 * CELL_PAD)
+  }
   const count = to - from + 1
   const cellsWidth = count * cellWidth
   // Ein langer Zustandsname über dem Kopf darf seitlich über die Zellen hinausragen
@@ -608,7 +619,6 @@ export function tapeFigureSvg(
   const left = (width - contentWidth) / 2 + overLeft
   const top = MARGIN + TAPE_HEADER + TAPE_HEAD
   const height = top + TAPE_CELL + MARGIN
-  const read = (p: number): string => tape.symbols[p - tape.start] ?? blank
   const cellX = (p: number): number => left + (p - from) * cellWidth
 
   const parts: string[] = [

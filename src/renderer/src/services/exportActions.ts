@@ -242,6 +242,26 @@ export function tapeRangeOf(steps: SimulationStep[]): { from: number; to: number
   return { from: from - 1, to: to + 1 }
 }
 
+/**
+ * Höchstens so viele Bandzellen zeigt ein Bild. Sonst zeichnete jede Seite einer Bildfolge das
+ * Band des ganzen Laufs, und der Export wüchse quadratisch mit der Schrittzahl.
+ */
+export const MAX_TAPE_CELLS = 31
+
+/**
+ * Ausschnitt für ein Bild: der ganze Bereich, wenn er klein genug ist, sonst `MAX_TAPE_CELLS`
+ * Zellen um den Kopf – am Rand des Bereichs angeschlagen, damit nichts außerhalb gezeigt wird.
+ */
+export function tapeWindow(
+  range: { from: number; to: number },
+  head: number
+): { from: number; to: number } {
+  if (range.to - range.from + 1 <= MAX_TAPE_CELLS) return range
+  const half = Math.floor(MAX_TAPE_CELLS / 2)
+  const from = Math.min(Math.max(head - half, range.from), range.to - MAX_TAPE_CELLS + 1)
+  return { from, to: from + MAX_TAPE_CELLS - 1 }
+}
+
 function prepare(
   content: ExportContent,
   format: ExportFormat,
@@ -292,7 +312,7 @@ function prepare(
   const minCells = snapshot.steps.reduce((max, s) => Math.max(max, s.stack?.length ?? 0), 1)
   // Turingmaschine: Band über dem Graphen, in der Bildfolge überall derselbe Ausschnitt
   const tapeRange = tapeRangeOf(snapshot.steps)
-  const { blank } = tapeSettings(document)
+  const { blank, alphabet: gamma } = tapeSettings(document)
   /** Beschreibung zu Schritt i, beim letzten mit dem Ergebnis */
   const describe = (i: number): string => {
     const text = describeStep(document, snapshot.steps[i], snapshot.steps[i - 1])
@@ -335,11 +355,14 @@ function prepare(
   const withStack = (graph: SvgImage, step: SimulationStep, i: number): SvgImage => {
     if (step.output) return columnSvg([outputFigure(step, i), graph], 8)
     if (step.tape) {
-      const tape = tapeFigureSvg(step.tape, step.head ?? 0, {
+      const head = step.head ?? 0
+      const tape = tapeFigureSvg(step.tape, head, {
         palette,
         blank,
         state: stateLabel(step),
-        ...tapeRange
+        // Zellbreite aus Γ: auf jeder Seite gleich, egal welche Symbole im Ausschnitt stehen
+        alphabet: gamma,
+        ...tapeWindow(tapeRange, head)
       })
       return columnSvg([tape, graph], 8)
     }
