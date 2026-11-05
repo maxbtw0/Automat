@@ -87,7 +87,7 @@ function positions(root: XmlElement): Map<string, { x: number; y: number }> {
     const radius = Number(valueOf(state, 'RADIUS') ?? STATE_RADIUS)
     const r = Number.isFinite(radius) && radius > 0 ? radius : STATE_RADIUS
     if (Number.isFinite(left) && Number.isFinite(top)) {
-      result.set(attribute(state, 'name'), { x: left + r, y: top + r })
+      result.set(attribute(state, 'name'), { x: clamp(left + r), y: clamp(top + r) })
     }
   }
   return spreadOut(result)
@@ -95,6 +95,15 @@ function positions(root: XmlElement): Map<string, { x: number; y: number }> {
 
 /** So weit stehen zwei Zustände mindestens auseinander – sonst überlappen die Beschriftungen. */
 const MIN_DISTANCE = 150
+
+/**
+ * Größer sind Koordinaten nie – bei 1e20 ergäbe x + 150 wieder x. Weiter entfernte Zustände
+ * landen am Rand und werden dort von `separateCoincident` getrennt.
+ */
+const MAX_COORDINATE = 1e6
+
+const clamp = (value: number): number =>
+  Math.min(MAX_COORDINATE, Math.max(-MAX_COORDINATE, value))
 
 /**
  * AutoEdit zeichnet kleiner und setzt Zustände oft dichter. Das ganze Layout wird dann
@@ -113,9 +122,14 @@ function spreadOut(
     }
   }
   if (!(closest < MIN_DISTANCE)) return separateCoincident(points)
-  const factor = MIN_DISTANCE / closest
+  // Gestreckt wird höchstens so weit, dass das Layout im Rahmen von MAX_COORDINATE bleibt
   const left = Math.min(...list.map((p) => p.x))
   const top = Math.min(...list.map((p) => p.y))
+  const extent = Math.max(...list.map((p) => Math.max(p.x - left, p.y - top)))
+  const factor = Math.max(
+    1,
+    Math.min(MIN_DISTANCE / closest, MAX_COORDINATE / Math.max(extent, 1))
+  )
   return separateCoincident(
     new Map(
       [...points].map(([name, p]) => [
@@ -140,7 +154,10 @@ function separateCoincident(
   for (const [name, original] of points) {
     let p = original
     if (near(p, 1)) {
-      while (near(p, MIN_DISTANCE)) p = { x: p.x + MIN_DISTANCE, y: p.y }
+      // Abbruch, falls die Addition nichts mehr ändert (sehr große Zahlen) – sonst endlos
+      while (near(p, MIN_DISTANCE) && p.x + MIN_DISTANCE !== p.x) {
+        p = { x: p.x + MIN_DISTANCE, y: p.y }
+      }
     }
     placed.push(p)
     result.set(name, p)

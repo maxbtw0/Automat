@@ -145,6 +145,35 @@ describe('importAutoEdit', () => {
     expect(points[0]).toMatchObject({ x: R, y: R })
   })
 
+  it('trennt auch Zustände an riesigen Koordinaten', () => {
+    const state = (name: string, left: string) =>
+      `<STATELAYOUT name="${name}"><LEFT value="${left}"/><TOP value="0"/></STATELAYOUT>`
+    const doc = importAutoEdit(`
+      <AUTOMATON><TYPE value="DEA"/><ALPHABET><ITEM value="a"/></ALPHABET>
+        <STATE name="q0" finalstate="false"/><STATE name="q1" finalstate="true"/>
+        <STATE name="q2" finalstate="true"/><INITIALSTATE value="q0"/>
+        <LAYOUT>${state('q0', '0')}${state('q1', '1e20')}${state('q2', '1e20')}</LAYOUT>
+      </AUTOMATON>`)
+    const [, q1, q2] = doc.graph.states
+    expect(Math.abs(q1.x - q2.x)).toBeGreaterThanOrEqual(150)
+    expect(Math.max(...doc.graph.states.map((s) => Math.abs(s.x)))).toBeLessThan(1e7)
+  })
+
+  it('streckt dichte Layouts nicht ins Unendliche', () => {
+    const state = (name: string, left: string) =>
+      `<STATELAYOUT name="${name}"><LEFT value="${left}"/><TOP value="0"/></STATELAYOUT>`
+    const doc = importAutoEdit(`
+      <AUTOMATON><TYPE value="DEA"/><ALPHABET><ITEM value="a"/></ALPHABET>
+        <STATE name="q0" finalstate="false"/><STATE name="q1" finalstate="false"/>
+        <STATE name="q2" finalstate="false"/><STATE name="q3" finalstate="true"/>
+        <INITIALSTATE value="q0"/>
+        <LAYOUT>${state('q0', '0')}${state('q1', '1e-300')}${state('q2', '1e6')}${state('q3', '1e6')}</LAYOUT>
+      </AUTOMATON>`)
+    const [, , q2, q3] = doc.graph.states
+    expect(Math.abs(q2.x - q3.x)).toBeGreaterThanOrEqual(150)
+    expect(Math.max(...doc.graph.states.map((s) => Math.abs(s.x)))).toBeLessThan(1e7)
+  })
+
   it('meldet unbekannte Typen und kaputte Dateien', () => {
     expect(() => importAutoEdit('<AUTOMATON><TYPE value="MOORE"/></AUTOMATON>')).toThrow(
       'AutoEdit-Typ „MOORE“ wird nicht unterstützt.'
