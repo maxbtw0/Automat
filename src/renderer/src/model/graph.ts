@@ -391,12 +391,17 @@ export function readsSymbol(edge: TransitionEdge, symbol: string): boolean {
   return edge.labels.some((l) => l.read === symbol)
 }
 
-/** Eindeutiger Schlüssel einer Regel – zwei Regeln mit gleichem Schlüssel sind gleich. */
+/**
+ * Eindeutiger Schlüssel einer Regel – zwei Regeln mit gleichem Schlüssel sind gleich. Als JSON,
+ * damit kein Symbol (Symbole dürfen fast jedes Zeichen enthalten) zwei Regeln verschmilzt.
+ */
 export function labelKey(label: TransitionLabel): string {
-  if (label.output !== undefined) return `${label.read}␟/${label.output.join(' ')}`
-  if (label.write !== undefined) return `${label.read}␟${label.write}␟${label.move ?? ''}`
-  if (label.pop === undefined) return label.read
-  return `${label.read}␟${label.pop}␟${(label.push ?? []).join(' ')}`
+  if (label.output !== undefined) return JSON.stringify(['output', label.read, label.output])
+  if (label.write !== undefined) {
+    return JSON.stringify(['tape', label.read, label.write, label.move ?? ''])
+  }
+  if (label.pop === undefined) return JSON.stringify(['read', label.read])
+  return JSON.stringify(['stack', label.read, label.pop, label.push ?? []])
 }
 
 const hasLabel = (labels: TransitionLabel[], label: TransitionLabel): boolean =>

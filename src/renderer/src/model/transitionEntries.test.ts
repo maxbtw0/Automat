@@ -74,6 +74,17 @@ describe('removeTransitionEntry', () => {
     expect(reads(g.transitions[0])).toEqual(['b'])
   })
 
+  it('verwechselt keine Stackregeln, deren Symbole das Trennzeichen enthalten', () => {
+    const first = { read: 'aa␟bb', pop: 'cc', push: [] }
+    const second = { read: 'aa', pop: 'bb␟cc', push: [] }
+    const g: EditorGraph = {
+      ...graph(),
+      transitions: [{ id: 't', from: 'q0', to: 'q1', labels: [first, second] }]
+    }
+    const after = removeTransitionEntry(g, { from: 'q0', to: 'q1', symbol: 'aa␟bb', pop: 'cc' })
+    expect(after.transitions[0].labels).toEqual([second])
+  })
+
   it('entfernt den Übergang, wenn das letzte Symbol weg ist', () => {
     const g = removeTransitionEntry(graph(), { from: 'q1', symbol: 'a', to: 'q1' })
     expect(g.transitions.map((t) => t.id)).toEqual(['t1'])
