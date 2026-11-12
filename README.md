@@ -66,7 +66,7 @@ npm run dev
 | `npm run typecheck` | TypeScript-Prüfung für main/preload und renderer |
 | `npm test` | Unit-Tests (vitest) |
 | `npm run build` | Typecheck + Produktions-Build nach `out/` |
-| `npm run dist` | Windows-Installer (NSIS) für x64 und arm64 nach `dist/` |
+| `npm run dist` | Windows-Installer (NSIS) und portable .exe für x64 und arm64 nach `dist/` |
 | `npm run icons` | App-Icon aus `build/icon.svg` neu erzeugen |
 
 ## Aufbau

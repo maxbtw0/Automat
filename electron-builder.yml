@@ -7,7 +7,10 @@ files:
   - out/**/*
   - package.json
 win:
-  target: nsis
+  # Installer und portable Version (eine .exe ohne Installation)
+  target:
+    - nsis
+    - portable
   icon: build/icon.ico
 nsis:
   oneClick: false
@@ -17,3 +20,6 @@ nsis:
   allowToChangeInstallationDirectory: true
   # Ein Installer pro Architektur: x64 (Intel/AMD) und arm64
   artifactName: ${productName} Setup ${version} ${arch}.${ext}
+portable:
+  # Entpackt sich bei jedem Start nach %TEMP%, keine Adminrechte nötig
+  artifactName: ${productName} ${version} ${arch} portable.${ext}
