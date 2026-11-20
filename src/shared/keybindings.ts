@@ -33,6 +33,7 @@ export const KEY_ACTION_IDS = [
   'tool.transition',
   'tool.delete',
   'tool.cancel',
+  'tool.snap',
   'sim.togglePlay',
   'sim.stepForward',
   'sim.stepBack',
@@ -160,6 +161,7 @@ export const KEY_ACTIONS: Record<KeyAction, KeyActionDefinition> = {
   'tool.state': { label: 'Zustand', group: 'Grapheneditor', scope: 'graph', defaults: ['S'] },
   'tool.transition': { label: 'Übergang', group: 'Grapheneditor', scope: 'graph', defaults: ['A'] },
   'tool.delete': { label: 'Löschen', group: 'Grapheneditor', scope: 'graph', defaults: ['D'] },
+  'tool.snap': { label: 'Einrasten', group: 'Grapheneditor', scope: 'graph', defaults: ['G'] },
   'tool.cancel': {
     label: 'Auswahl aufheben',
     group: 'Grapheneditor',

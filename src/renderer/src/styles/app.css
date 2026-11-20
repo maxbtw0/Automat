@@ -1177,6 +1177,12 @@ h4 {
   color: var(--accent);
 }
 
+.tool-palette.is-toggles {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
 /* ---------- Canvas ---------- */
 .canvas {
   display: block;
@@ -1214,6 +1220,9 @@ h4 {
 
 .grid-dot {
   fill: var(--grid-dot);
+}
+.snap-dot {
+  fill: var(--snap-dot);
 }
 
 .state-circle {

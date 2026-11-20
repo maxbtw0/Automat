@@ -85,6 +85,12 @@ export function initSettings(): () => void {
   }
 }
 
+/** Schaltet das Einrasten um – wird wie jede Einstellung gespeichert, steht aber nicht im Dokument. */
+export function toggleSnapToGrid(): void {
+  const { settings, setSettings } = useSettingsStore.getState()
+  setSettings({ ...settings, snapToGrid: !settings.snapToGrid })
+}
+
 export function openSettings(): void {
   useDialogStore.getState().setSettingsOpen(true)
 }

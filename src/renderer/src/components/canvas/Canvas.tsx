@@ -33,6 +33,9 @@ import {
   loopFromPoint,
   previewEdgePath,
   screenToWorld,
+  snapDelta,
+  snapPoint,
+  SNAP_SIZE,
   worldToScreen,
   type Point
 } from '@/utils/geometry'
@@ -80,6 +83,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const inlineEdit = useEditorStore((s) => s.inlineEdit)
 
   const { panKey, panMiddleMouse } = useSettingsStore((s) => s.settings.navigation)
+  const snapSetting = useSettingsStore((s) => s.settings.snapToGrid)
+  /** Raster nur im Editor, nicht in der Simulation */
+  const snap = snapSetting && !readOnly
   /** Verschiebe-Taste gedrückt (aus keydown/keyup – die Leertaste steht in keinem Mausereignis) */
   const [panKeyDown, setPanKeyDown] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
@@ -121,6 +127,9 @@ export function Canvas({ readOnly = false }: CanvasProps) {
 
   const clientToWorld = (clientX: number, clientY: number): Point =>
     screenToWorld(useEditorStore.getState().viewport, containerPoint(clientX, clientY))
+
+  /** Stelle für einen neuen Zustand: bei eingeschaltetem Einrasten auf dem Raster */
+  const placement = (p: Point): Point => (snap ? snapPoint(p) : p)
 
   // ---------- Zoom (Mausrad) ----------
 
@@ -303,7 +312,12 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   }
 
   /** Verschiebt die Zustände `ids` gemeinsam; `onClick` = losgelassen, ohne zu ziehen. */
-  const startDrag = (e: PointerEvent, ids: StateId[], onClick?: () => void): void => {
+  const startDrag = (
+    e: PointerEvent,
+    ids: StateId[],
+    anchorId: StateId,
+    onClick?: () => void
+  ): void => {
     const pointer = clientToWorld(e.clientX, e.clientY)
     const origins = useEditorStore
       .getState()
@@ -321,8 +335,10 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           store.snapshot()
         }
         const p = clientToWorld(ev.clientX, ev.clientY)
-        const dx = p.x - pointer.x
-        const dy = p.y - pointer.y
+        const raw = { x: p.x - pointer.x, y: p.y - pointer.y }
+        // Einrasten: der angefasste Zustand rastet ein, alle anderen bewegen sich um dasselbe Delta
+        const anchor = origins.find((s) => s.id === anchorId)
+        const { x: dx, y: dy } = snap && anchor ? snapDelta(anchor, raw) : raw
         store.moveStatesLive(new Map(origins.map((s) => [s.id, { x: s.x + dx, y: s.y + dy }])))
       },
       () => {
@@ -452,7 +468,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     switch (tool) {
       case 'state': {
         // Erst beim Loslassen anlegen: Zwei Finger zum Zoomen sollen keinen Zustand erzeugen
-        const p = clientToWorld(e.clientX, e.clientY)
+        const p = placement(clientToWorld(e.clientX, e.clientY))
         trackPointer(e, () => {}, () => {
           const id = store.addState(p.x, p.y)
           store.select({ kind: 'state', id })
@@ -473,7 +489,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const handleBackgroundDoubleClick = (e: MouseEvent<SVGSVGElement>): void => {
     if (readOnly || tool !== 'select') return
     const store = useEditorStore.getState()
-    const p = clientToWorld(e.clientX, e.clientY)
+    const p = placement(clientToWorld(e.clientX, e.clientY))
     const id = store.addState(p.x, p.y)
     store.select({ kind: 'state', id })
   }
@@ -509,10 +525,10 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         const single = (): void => store.select({ kind: 'state', id: state.id })
         // Teil einer Gruppe → alle zusammen ziehen; nur angeklickt → nur dieser Zustand
         if (store.selection?.kind === 'group' && isSelected(store.selection, 'state', state.id)) {
-          startDrag(e, store.selection.stateIds, single)
+          startDrag(e, store.selection.stateIds, state.id, single)
         } else {
           single()
-          startDrag(e, [state.id])
+          startDrag(e, [state.id], state.id)
         }
       }
     }
@@ -618,7 +634,8 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           {
             label: 'Zustand hier einfügen',
             onSelect: () => {
-              const id = store.addState(menu.world.x, menu.world.y)
+              const p = placement(menu.world)
+              const id = store.addState(p.x, p.y)
               store.select({ kind: 'state', id })
             }
           },
@@ -712,6 +729,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   const previewFrom = connectPreview && findState(doc.graph, connectPreview.fromId)
   const previewPath = previewFrom && previewEdgePath(previewFrom, connectPreview.pointer)
   const gridStep = GRID_SIZE * viewport.zoom
+  const snapStep = SNAP_SIZE * viewport.zoom
 
   return (
     <>
@@ -738,6 +756,19 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           >
             <circle className="grid-dot" cx={1} cy={1} r={1} />
           </pattern>
+          {snap && (
+            // Rasterkreuze bei Vielfachen von SNAP_SIZE (Mittelpunkt der Kachel = Kreuz)
+            <pattern
+              id="snap-grid"
+              width={snapStep}
+              height={snapStep}
+              x={viewport.x - snapStep / 2}
+              y={viewport.y - snapStep / 2}
+              patternUnits="userSpaceOnUse"
+            >
+              <circle className="snap-dot" cx={snapStep / 2} cy={snapStep / 2} r={2} />
+            </pattern>
+          )}
           {(['arrow', 'arrow-start', 'arrow-selected', 'arrow-active'] as const).map((id) => (
             <marker
               key={id}
@@ -764,6 +795,7 @@ export function Canvas({ readOnly = false }: CanvasProps) {
         </defs>
 
         <rect width="100%" height="100%" fill="url(#grid)" />
+        {snap && <rect width="100%" height="100%" fill="url(#snap-grid)" />}
 
         <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}>
           {transitions.map((t) => {

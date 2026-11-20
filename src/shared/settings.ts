@@ -34,6 +34,8 @@ export interface Settings {
   simulation: SimulationSettings
   /** Grapheneditor: Ansicht verschieben */
   navigation: NavigationSettings
+  /** Grapheneditor: Zustände rasten am Raster ein (Magnet-Knopf) */
+  snapToGrid: boolean
 }
 
 /** Bei Strukturänderungen erhöhen und in `normalizeSettings` migrieren. */
@@ -45,7 +47,8 @@ export function defaultSettings(): Settings {
     alphabetPresets: defaultAlphabetPresets(),
     newAutomaton: { ...DEFAULT_NEW_AUTOMATON },
     simulation: { ...DEFAULT_SIMULATION },
-    navigation: { ...DEFAULT_NAVIGATION }
+    navigation: { ...DEFAULT_NAVIGATION },
+    snapToGrid: false
   }
 }
 
@@ -57,7 +60,8 @@ export function normalizeSettings(raw: unknown): Settings {
     alphabetPresets: normalizeAlphabetPresets(record['alphabetPresets']),
     newAutomaton: normalizeNewAutomaton(record['newAutomaton']),
     simulation: normalizeSimulation(record['simulation']),
-    navigation: normalizeNavigation(record['navigation'])
+    navigation: normalizeNavigation(record['navigation']),
+    snapToGrid: record['snapToGrid'] === true
   }
 }
 

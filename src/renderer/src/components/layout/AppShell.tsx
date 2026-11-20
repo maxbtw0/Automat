@@ -1,5 +1,6 @@
 import { Canvas } from '@/components/canvas/Canvas'
 import { PropertiesPanel } from '@/components/panels/PropertiesPanel'
+import { SnapToggle } from '@/components/toolbar/SnapToggle'
 import { ToolPalette } from '@/components/toolbar/ToolPalette'
 import { useEditorStore } from '@/store/editorStore'
 import { TOOLS } from '@/editor/tools'
@@ -14,6 +15,7 @@ export function AppShell() {
     <div className={classNames('app-shell', !hasSelection && 'is-side-hidden')}>
       <nav className="area-tools">
         <ToolPalette tools={TOOLS} active={tool} onSelect={setTool} />
+        <SnapToggle />
       </nav>
       <main className="area-canvas">
         <Canvas />

@@ -121,3 +121,12 @@ describe('Einstellungen – Ansicht verschieben', () => {
     expect(isPanKey('none', { key: ' ', code: 'Space' })).toBe(false)
   })
 })
+
+describe('Einstellungen – Einrasten', () => {
+  it('ist standardmäßig aus und wird nur bei true übernommen', () => {
+    expect(defaultSettings().snapToGrid).toBe(false)
+    expect(normalizeSettings({}).snapToGrid).toBe(false)
+    expect(normalizeSettings({ snapToGrid: 'ja' }).snapToGrid).toBe(false)
+    expect(normalizeSettings({ snapToGrid: true }).snapToGrid).toBe(true)
+  })
+})

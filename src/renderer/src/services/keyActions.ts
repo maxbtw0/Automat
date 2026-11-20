@@ -8,7 +8,7 @@ import { isEditableTarget } from '@/utils/dom'
 import { runMenuAction } from './fileActions'
 import { openHelp } from './helpActions'
 import { deleteSelected, selectAll } from './tableSelection'
-import { openSettings } from './settingsActions'
+import { openSettings, toggleSnapToGrid } from './settingsActions'
 import {
   openAlphabetEditor,
   openGraphEditor,
@@ -105,6 +105,8 @@ export function runKeyAction(action: KeyAction): void {
       return store.setTool('transition')
     case 'tool.delete':
       return store.setTool('delete')
+    case 'tool.snap':
+      return toggleSnapToGrid()
     case 'tool.cancel':
       store.select(null)
       return store.setTool('select')

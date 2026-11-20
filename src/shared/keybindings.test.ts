@@ -127,4 +127,11 @@ describe('Einstellungen', () => {
     expect(JSON.parse(text).version).toBe(1)
     expect(normalizeSettings(JSON.parse(text))).toEqual(settings)
   })
+
+  it('Einrasten liegt auf G im Grapheneditor und kollidiert mit nichts', () => {
+    const bindings = defaultKeybindings()
+    expect(bindings['tool.snap']).toEqual(['G'])
+    expect(actionForCombo(bindings, 'G', 'graph')).toBe('tool.snap')
+    expect(findConflict(bindings, 'tool.snap', 'G')).toBeNull()
+  })
 })

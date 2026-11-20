@@ -9,6 +9,7 @@ const PATHS = {
   lasso: 'M14 13l7 3.2-3 1.1-1.2 3z',
   state: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z',
   transition: 'M5 19L19 5 M9 5h10v10',
+  magnet: 'M5 3h4v8a3 3 0 0 0 6 0V3h4v8a7 7 0 0 1-14 0z M5 8h4 M15 8h4',
   delete: 'M3 6h18 M8 6V4h8v2 M6 6l1 14h10l1-14',
   plus: 'M12 5v14 M5 12h14',
   preset: 'M8 20V4h5a4 4 0 0 1 0 8H8',
