@@ -1,5 +1,5 @@
 import { EPSILON, edgeSymbols, type AutomatonDocument } from '@/model/graph'
-import { StateSetSimulator } from './setSimulator'
+import { NfaSimulator } from './nfaSimulator'
 import type { Automaton, Simulator, ValidationIssue } from './types'
 import {
   checkAlphabets,
@@ -17,9 +17,9 @@ export { startState } from './validation'
  *
  *   A = (Q, Σ, δ, q0, F)   mit   δ: Q × (Σ ∪ {ε}) → 𝒫(Q)
  *
- * Statt eines aktuellen Zustands gibt es eine Menge aktiver Zustände. Nach jedem Schritt
- * (und am Anfang) kommt die ε-Hülle dazu. Akzeptiert wird, wenn nach dem ganzen Wort
- * mindestens ein aktiver Zustand ein Endzustand ist.
+ * Wo der NEA die Wahl hat, probiert die Simulation einen Weg nach dem anderen (erst Schleifen,
+ * dann weiter, bei einer Sackgasse zurück). Akzeptiert wird, wenn ein Lauf das ganze Wort liest
+ * und in einem Endzustand endet (`NfaSimulator`).
  */
 export class NFA implements Automaton {
   readonly type = 'NFA' as const
@@ -42,7 +42,7 @@ export class NFA implements Automaton {
   }
 
   createSimulator(word: string): Simulator {
-    return new StateSetSimulator(this.document, word, { epsilon: true })
+    return new NfaSimulator(this.document, word)
   }
 }
 

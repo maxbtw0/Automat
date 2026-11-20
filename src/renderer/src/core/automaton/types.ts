@@ -38,12 +38,11 @@ export interface TapeSnapshot {
 export interface SimulationStep {
   /** 0 = Startkonfiguration, danach 1, 2, … */
   index: number
-  /** Aktuelle Zustände (beim DEA genau einer, beim NEA die ganze Menge δ*(q0, gelesen)) */
+  /** Aktuelle Zustände (bei den Simulatoren der Typen genau einer) */
   activeStateIds: StateId[]
   /**
-   * NEA/DEA: die aktiven Zustände auf dem erklärten Pfad (akzeptierend bzw. am weitesten
-   * kommend) – Canvas und Tabelle heben sie hervor, die übrigen aktiven nur dezent. Fehlt es,
-   * sind alle aktiven Zustände hervorgehoben.
+   * Zustandsmengen: die aktiven Zustände auf dem erklärten Pfad – Canvas und Tabelle heben sie
+   * hervor, die übrigen aktiven nur dezent. Fehlt es, sind alle aktiven Zustände hervorgehoben.
    */
   pathStateIds?: StateId[]
   /** Im letzten Schritt benutzte Übergänge – werden im Canvas hervorgehoben */
@@ -121,6 +120,6 @@ export interface AutomatonDefinition {
   epsilon: boolean
   /** Reguläre Ausdrücke – nur bei endlichen Automaten */
   regex: boolean
-  /** Die Simulation zeigt pro Schritt genau einen Zustand (einen Lauf statt einer Menge) */
+  /** Die Simulation zeigt pro Schritt genau einen Zustand (einen Lauf statt einer Menge) – derzeit bei allen Typen */
   singlePath: boolean
 }

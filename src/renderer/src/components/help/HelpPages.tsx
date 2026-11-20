@@ -214,9 +214,9 @@ function NfaPage() {
       <Section title="Arbeitsweise">
         <p>
           Der NEA startet in {Z0} und liest das Wort von links nach rechts. Wo er die Wahl hat,
-          verfolgt man alle Möglichkeiten gleichzeitig: Der NEA ist also in einer Menge von
-          Zuständen. Das Wort ist akzeptiert, wenn <em>mindestens ein</em> Weg nach dem letzten
-          Zeichen in einem Endzustand endet.
+          „rät“ er den richtigen Weg: Das Wort ist akzeptiert, wenn <em>mindestens ein</em> Lauf
+          nach dem letzten Zeichen in einem Endzustand endet. Praktisch probiert man die Wege
+          nacheinander aus und geht bei einer Sackgasse zur letzten Wahl zurück.
         </p>
       </Section>
       <Section title="Sprache">

@@ -28,7 +28,7 @@ const definitions: Record<AutomatonType, AutomatonDefinition> = {
     create: (document) => new NFA(document),
     epsilon: true,
     regex: true,
-    singlePath: false
+    singlePath: true
   },
   DPDA: {
     type: 'DPDA',

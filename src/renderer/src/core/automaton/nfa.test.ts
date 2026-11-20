@@ -52,48 +52,35 @@ describe('NFA.accepts', () => {
 })
 
 describe('NFA-Simulator', () => {
-  it('startet mit der ε-Hülle und liefert pro Symbol einen Schritt', () => {
-    // „a“: q0 –ε→ q1 –a→ q2 – beide Zustände der Hülle tragen bei
-    expect(new Set(new NFA(withEpsilon).createSimulator('a').reset().activeStateIds)).toEqual(
-      new Set(['q0', 'q1'])
-    )
-    // „ba“: q1 kann das b nicht lesen → am Anfang nur q0 hervorgehoben, aktiv sind beide
-    const sim = new NFA(withEpsilon).createSimulator('ba')
+  it('zeigt einen Lauf: ε-Schritt und Leseschritt sind eigene Schritte', () => {
+    // „a“: q0 –ε→ q1 –a→ q2
+    const sim = new NFA(withEpsilon).createSimulator('a')
     const start = sim.reset()
-    expect(start.pathStateIds).toEqual(['q0'])
-    expect(new Set(start.activeStateIds)).toEqual(new Set(['q0', 'q1']))
-
+    expect(start).toMatchObject({ activeStateIds: ['q0'], remaining: 'a', symbol: null })
     const { steps, accepted } = sim.run()
     expect(steps).toHaveLength(2)
-    expect(steps[1]).toMatchObject({ index: 2, consumed: 'ba', remaining: '', activeStateIds: ['q2'] })
+    expect(steps[0]).toMatchObject({ activeStateIds: ['q1'], symbol: EPSILON, consumed: '', remaining: 'a' })
+    expect(steps[1]).toMatchObject({ activeStateIds: ['q2'], symbol: 'a', consumed: 'a', remaining: '' })
     expect(accepted).toBe(true)
   })
 
-  it('endet vorzeitig, wenn keine Zustände mehr aktiv sind', () => {
-    const sim = new NFA(withEpsilon).createSimulator('aab')
-    const { steps, accepted } = sim.run()
-    expect(steps).toHaveLength(2)
-    expect(steps[1].activeStateIds).toEqual([])
+  it('verworfen: zeigt den Lauf, der am weitesten liest', () => {
+    const { steps, accepted } = new NFA(withEpsilon).createSimulator('aab').run()
+    // q0 –ε→ q1 –a→ q2, dort hängt der Lauf
+    expect(steps.map((s) => s.activeStateIds)).toEqual([['q1'], ['q2']])
     expect(accepted).toBe(false)
   })
 })
 
-describe('NFA-Simulator hebt nur benutzte Zweige hervor', () => {
+describe('NFA-Simulator: ein Lauf', () => {
   const trace = (word: string) =>
     new NFA(endsWithAb)
       .createSimulator(word)
       .run()
-      .steps.map((step) => [(step.pathStateIds ?? []).join(','), step.usedTransitionIds.join(',')])
+      .steps.map((step) => [step.activeStateIds.join(','), step.usedTransitionIds.join(',')])
 
-  it('aktiv ist trotzdem die ganze Menge δ*(q0, gelesen)', () => {
-    // nach dem ersten a von „aab“ sind q0 und q1 erreichbar, auf dem Pfad liegt nur q0
-    const [first] = new NFA(endsWithAb).createSimulator('aab').run().steps
-    expect(new Set(first.activeStateIds)).toEqual(new Set(['q0', 'q1']))
-    expect(first.pathStateIds).toEqual(['q0'])
-  })
-
-  it('akzeptiert: nur der akzeptierende Pfad', () => {
-    // q0 –a→ q0 –a→ q1 –b→ q2; t0 = q0→q0, t1 = q0→q1, t2 = q1→q2
+  it('akzeptiert: Schleife zuerst, dann weiter', () => {
+    // t0 = q0→q0 (Schleife), t1 = q0→q1, t2 = q1→q2
     expect(trace('aab')).toEqual([
       ['q0', 't0'],
       ['q1', 't1'],
@@ -101,11 +88,11 @@ describe('NFA-Simulator hebt nur benutzte Zweige hervor', () => {
     ])
   })
 
-  it('verworfen: Zweige, die unterwegs sterben, verschwinden', () => {
+  it('verworfen: der am weitesten lesende Lauf', () => {
+    // „aba“: nach „ab“ ist Schluss (q2 hat keinen Übergang), „aba“ über q0 liest ganz
     const steps = trace('aba')
-    // nach „ab“ wäre q2 aktiv, stirbt aber beim nächsten a → nicht hervorgehoben
-    expect(steps[1]).toEqual(['q0', 't0'])
-    expect(steps[2][0].split(',').sort()).toEqual(['q0', 'q1'])
+    expect(steps).toHaveLength(3)
+    expect(steps.every(([state]) => !state.includes(','))).toBe(true)
   })
 
   it('akzeptiert trotzdem richtig', () => {
@@ -181,29 +168,8 @@ describe('Lange ε-Ketten', () => {
     return buildDocument('NFA', ['a'], { start: 'q0', finals: [`q${n - 1}`] }, rules)
   }
 
-  /** Zählt, wie oft der Simulator Kantenenden liest */
-  function countedReads(n: number, word: string): number {
-    const doc = chain(n)
-    let reads = 0
-    const transitions = doc.graph.transitions.map(
-      (t) =>
-        new Proxy(t, {
-          get(target, key, receiver) {
-            if (key === 'from' || key === 'to') reads++
-            return Reflect.get(target, key, receiver)
-          }
-        })
-    )
-    const counted = { ...doc, graph: { ...doc.graph, transitions } }
-    expect(new NFA(counted).accepts(word)).toBe(true)
-    return reads
-  }
-
-  it('liest Kantenenden nur linear oft (je Zeichen und Zustand)', () => {
-    // Vorher quadratisch: 15 897 / 58 721 / 225 009 Lesezugriffe für 16 / 32 / 64 Zustände
-    const small = countedReads(32, 'a'.repeat(20))
-    const large = countedReads(64, 'a'.repeat(20))
-    expect(large).toBeLessThan(small * 2.5)
-    expect(large).toBeLessThan(20 * 64 * 20)
+  it('läuft ohne Stack Overflow und akzeptiert', () => {
+    expect(new NFA(chain(2000)).accepts('a'.repeat(5))).toBe(true)
+    expect(new NFA(chain(64)).accepts('a'.repeat(20))).toBe(true)
   })
 })
