@@ -603,3 +603,34 @@ describe('Ausgabealphabet Δ', () => {
     expect(store().document.output?.alphabet).toEqual(['a', 'b', '0', '1'])
   })
 })
+
+describe('Übergang biegen', () => {
+  it('Live-Änderungen nach einem Snapshot sind ein Undo-Schritt und ändern die revision nicht', () => {
+    const { transitionId } = setupAB()
+    const shapeOf = () => store().document.graph.transitions.find((t) => t.id === transitionId)
+    const revision = store().revision
+    const past = store().past.length
+    store().snapshot()
+    store().setTransitionShapeLive(transitionId, { bend: 20 })
+    store().setTransitionShapeLive(transitionId, { bend: 55 })
+    expect(shapeOf()?.bend).toBe(55)
+    expect(store().revision).toBe(revision)
+    expect(store().past).toHaveLength(past + 1)
+    store().undo()
+    expect(shapeOf()?.bend).toBeUndefined()
+  })
+
+  it('resetTransitionShape entfernt die Form in einem Undo-Schritt, ohne Form kein Eintrag', () => {
+    const { transitionId } = setupAB()
+    const shapeOf = () => store().document.graph.transitions.find((t) => t.id === transitionId)
+    const past = store().past.length
+    store().resetTransitionShape(transitionId)
+    expect(store().past).toHaveLength(past)
+    store().snapshot()
+    store().setTransitionShapeLive(transitionId, { bend: 40 })
+    store().resetTransitionShape(transitionId)
+    expect(shapeOf()).not.toHaveProperty('bend')
+    store().undo()
+    expect(shapeOf()?.bend).toBe(40)
+  })
+})

@@ -21,6 +21,8 @@ export interface EdgeGeometry {
   label: Point
   /** Richtung (Einheitsvektor), in der die Beschriftung vom Übergang weg liegt */
   labelSide: Point
+  /** Punkt in der Mitte der Linie (Scheitel des Bogens) – dort sitzt der Griff zum Biegen */
+  mid: Point
 }
 
 export const clamp = (value: number, min: number, max: number): number =>
@@ -46,8 +48,29 @@ export function straightEdge(a: Point, b: Point, r = STATE_RADIUS): EdgeGeometry
   return {
     path: `M ${start.x} ${start.y} L ${end.x} ${end.y}`,
     label: add(mid, scale(normalOf(dir), LABEL_OFFSET)),
-    labelSide: normalOf(dir)
+    labelSide: normalOf(dir),
+    mid
   }
+}
+
+/** Ab diesem Versatz (Weltpixel) gilt ein Bogen als Bogen, darunter wird er wieder gerade. */
+export const BEND_STRAIGHT_THRESHOLD = 6
+
+/**
+ * Versatz des Bogens beim Ziehen: Der Scheitel soll unter dem Zeiger `p` liegen. Der Scheitel
+ * einer quadratischen Bézierkurve liegt halb so weit von der Sehne wie ihr Kontrollpunkt, daher
+ * der Faktor 2. Vorzeichen wie bei `curvedEdge`, bezogen auf die Richtung a → b.
+ */
+export function bendFromPoint(a: Point, b: Point, p: Point, r = STATE_RADIUS): number {
+  const normal = normalOf(normalize(sub(b, a)))
+  const mid = scale(add(a, b), 0.5)
+  const side = (q: Point): number => (q.x - mid.x) * normal.x + (q.y - mid.y) * normal.y
+  const target = side(p)
+  // Die Kurve beginnt am Kreisrand, ihr Scheitel liegt etwas weiter außen als bend / 2:
+  // ein paar Schritte nachführen, bis er unter dem Zeiger liegt.
+  let bend = 2 * target
+  for (let i = 0; i < 6; i++) bend += 2 * (target - side(curvedEdge(a, b, r, bend).mid))
+  return bend
 }
 
 /** Gebogene Kante – für Gegenkanten (a→b und b→a), die sonst übereinander lägen. */
@@ -62,17 +85,19 @@ export function curvedEdge(a: Point, b: Point, r = STATE_RADIUS, bend = 45): Edg
   return {
     path: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
     label: add(peak, scale(normal, LABEL_OFFSET)),
-    labelSide: normal
+    labelSide: normal,
+    mid: peak
   }
 }
 
 /**
  * Schleife am Zustand. `angle` = Richtung, in die sie zeigt (0 = oben, im Uhrzeigersinn,
  * Bogenmaß). Gezeichnet wird sie wie nach oben und dann um den Mittelpunkt gedreht.
+ * `size` streckt sie vom Zustand weg (1 = Standard).
  */
-export function selfLoop(a: Point, r = STATE_RADIUS, angle = 0): EdgeGeometry {
+export function selfLoop(a: Point, r = STATE_RADIUS, angle = 0, size = 1): EdgeGeometry {
   const spread = Math.PI / 7
-  const height = r * 2.6
+  const height = r * 2.6 * size
   const cos = Math.cos(angle)
   const sin = Math.sin(angle)
   // Punkt relativ zum Mittelpunkt (für „oben“ berechnet) drehen und verschieben
@@ -91,8 +116,53 @@ export function selfLoop(a: Point, r = STATE_RADIUS, angle = 0): EdgeGeometry {
   return {
     path: `M ${start.x} ${start.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}`,
     label: at(0, -labelDistance),
-    labelSide: { x: sin, y: -cos }
+    labelSide: { x: sin, y: -cos },
+    mid: at(0, -peak)
   }
+}
+
+/** Kleinste und größte Weite einer Schleife (Faktor auf die Standardhöhe) */
+export const LOOP_MIN_SIZE = 0.6
+export const LOOP_MAX_SIZE = 2.5
+/** Innerhalb dieser Abweichung rastet die Weite auf 1 (Standard) ein */
+const LOOP_SIZE_SNAP = 0.08
+
+/**
+ * Richtung und Weite einer Schleife beim Ziehen: Der Scheitel soll unter dem Zeiger `p` liegen.
+ * Winkel wie bei `selfLoop` (0 = oben, im Uhrzeigersinn). `size` = 1 heißt Standardweite.
+ */
+export function loopFromPoint(a: Point, p: Point, r = STATE_RADIUS): { angle: number; size: number } {
+  const dx = p.x - a.x
+  const dy = p.y - a.y
+  const spread = Math.PI / 7
+  // Umkehrung des Scheitels aus `selfLoop`
+  const size = clamp(
+    (Math.hypot(dx, dy) - 0.25 * r * Math.cos(spread)) / (0.75 * r * 2.6),
+    LOOP_MIN_SIZE,
+    LOOP_MAX_SIZE
+  )
+  return {
+    angle: Math.atan2(dx, -dy),
+    size: Math.abs(size - 1) < LOOP_SIZE_SNAP ? 1 : size
+  }
+}
+
+/** Raster fürs Einrasten (Weltpixel) */
+export const SNAP_SIZE = 60
+
+/** Rastet einen Punkt auf das nächste Rasterkreuz ein. */
+export function snapPoint(p: Point, size = SNAP_SIZE): Point {
+  // + 0 macht aus -0 eine 0
+  return { x: Math.round(p.x / size) * size + 0, y: Math.round(p.y / size) * size + 0 }
+}
+
+/**
+ * Verschiebung beim Ziehen: Der angefasste Zustand (`origin`) rastet ein, dieselbe Verschiebung
+ * gilt für alle anderen Zustände der Gruppe, damit ihre Abstände erhalten bleiben.
+ */
+export function snapDelta(origin: Point, delta: Point, size = SNAP_SIZE): Point {
+  const target = snapPoint({ x: origin.x + delta.x, y: origin.y + delta.y }, size)
+  return { x: target.x - origin.x, y: target.y - origin.y }
 }
 
 /** Zeilenabstand mehrzeiliger Beschriftungen (Stackregeln) */
@@ -189,8 +259,12 @@ export function transitionGeometry(
   const from = index.states.get(transition.from)
   const to = index.states.get(transition.to)
   if (!from || !to) return null
-  if (from.id === to.id) return selfLoop(from, STATE_RADIUS, loopAngle(from, graph, index))
+  if (from.id === to.id) {
+    const angle = transition.loopAngle ?? loopAngle(from, graph, index)
+    return selfLoop(from, STATE_RADIUS, angle, transition.loopSize ?? 1)
+  }
 
+  if (transition.bend !== undefined) return curvedEdge(from, to, STATE_RADIUS, transition.bend)
   const hasReverse = index.pairs.has(pairKey(transition.to, transition.from))
   return hasReverse ? curvedEdge(from, to) : straightEdge(from, to)
 }

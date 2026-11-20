@@ -1326,6 +1326,14 @@ h4 {
 .transition.is-active .transition-label {
   fill: var(--accent);
 }
+.bend-handle {
+  fill: var(--bg-canvas);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.canvas.tool-select .bend-handle {
+  cursor: grab;
+}
 .canvas.tool-delete .transition:hover .transition-line {
   stroke: var(--danger);
 }

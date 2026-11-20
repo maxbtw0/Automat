@@ -6,6 +6,7 @@ import {
   nextFreeSymbol,
   createStateNode,
   nextStatePosition,
+  withShape,
   addTransitionEntry,
   removeTransitionEntry,
   replaceTransitionEntry,
@@ -28,7 +29,8 @@ import {
   type StateId,
   type StateNode,
   type TransitionEdge,
-  type TransitionId
+  type TransitionId,
+  type TransitionShape
 } from '@/model/graph'
 
 export type { AlphabetKind } from '@/model/graph'
@@ -229,6 +231,10 @@ interface EditorState {
   updateTransition(id: TransitionId, patch: Partial<Omit<TransitionEdge, 'id'>>): void
   /** Hängt Regeln an, die der Übergang noch nicht hat. */
   addTransitionLabels(id: TransitionId, labels: TransitionLabel[]): void
+  /** Biegen/Schleife drehen beim Ziehen: ohne Verlaufseintrag und ohne `revision` – vorher `snapshot()`. */
+  setTransitionShapeLive(id: TransitionId, shape: TransitionShape): void
+  /** Übergang wieder gerade bzw. Schleife auf die automatische Stelle – ein Undo-Schritt */
+  resetTransitionShape(id: TransitionId): void
   deleteTransition(id: TransitionId): void
 
   // --- Übergangstabelle (eine Zeile = δ(from, symbol) = to) ---
@@ -713,6 +719,25 @@ export const useEditorStore = create<EditorState>()((set, get) => {
           transitions: doc.graph.transitions.map((t) => (t.id === id ? { ...t, ...patch } : t))
         })
       ),
+    setTransitionShapeLive: (id, shape) =>
+      set((s) => ({
+        document: withGraph(s.document, {
+          transitions: s.document.graph.transitions.map((t) =>
+            t.id === id ? withShape(t, shape) : t
+          )
+        }),
+        dirty: true
+      })),
+    resetTransitionShape: (id) =>
+      commit((doc) => {
+        const edge = doc.graph.transitions.find((t) => t.id === id)
+        if (!edge || (edge.bend === undefined && edge.loopAngle === undefined && edge.loopSize === undefined)) {
+          return doc
+        }
+        return withGraph(doc, {
+          transitions: doc.graph.transitions.map((t) => (t === edge ? withShape(t, {}) : t))
+        })
+      }),
     addTransitionLabels: (id, labels) =>
       commit((doc) => {
         const edge = doc.graph.transitions.find((t) => t.id === id)

@@ -24,10 +24,13 @@ import { useSettingsStore } from '@/store/settingsStore'
 import { classNames, isEditableTarget } from '@/utils/dom'
 import {
   clamp,
+  BEND_STRAIGHT_THRESHOLD,
+  bendFromPoint,
   boxCorners,
   edgeGeometries,
   elementsInPolygon,
   findStateAt,
+  loopFromPoint,
   previewEdgePath,
   screenToWorld,
   worldToScreen,
@@ -329,6 +332,42 @@ export function Canvas({ readOnly = false }: CanvasProps) {
   }
 
   /**
+   * Übergang an der Linie anfassen und biegen (Schleife: drehen und weiten). Ein einfacher
+   * Klick bleibt eine Auswahl; erst ab `DRAG_THRESHOLD` wird gebogen, alles ein Undo-Schritt.
+   */
+  const startBend = (e: PointerEvent, t: TransitionEdge): void => {
+    const startX = e.clientX
+    const startY = e.clientY
+    let moved = false
+    trackPointer(e, (ev) => {
+      const store = useEditorStore.getState()
+      if (!moved) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return
+        moved = true
+        store.snapshot()
+      }
+      const { states, transitions } = store.document.graph
+      const from = states.find((s) => s.id === t.from)
+      const to = states.find((s) => s.id === t.to)
+      if (!from || !to) return
+      const p = clientToWorld(ev.clientX, ev.clientY)
+      if (from.id === to.id) {
+        const { angle, size } = loopFromPoint(from, p)
+        store.setTransitionShapeLive(t.id, {
+          loopAngle: angle,
+          ...(size !== 1 && { loopSize: size })
+        })
+        return
+      }
+      const bend = bendFromPoint(from, to, p)
+      // Fast gerade → wieder automatisch; mit Gegenkante bleibt der Bogen, sonst läge sie darauf
+      const hasReverse = transitions.some((o) => o.from === t.to && o.to === t.from)
+      const straight = Math.abs(bend) < BEND_STRAIGHT_THRESHOLD && !hasReverse
+      store.setTransitionShapeLive(t.id, straight ? {} : { bend })
+    })
+  }
+
+  /**
    * Rechteck (Auswahl-Werkzeug) oder freie Form (Lasso) aufziehen; mit Umschalt kommt der
    * Inhalt zur bisherigen Auswahl dazu.
    */
@@ -507,7 +546,10 @@ export function Canvas({ readOnly = false }: CanvasProps) {
     const store = useEditorStore.getState()
     if (tool === 'delete') store.deleteTransition(t.id)
     else if (e.shiftKey) store.select(toggleSelected(store.selection, 'transition', t.id))
-    else store.select({ kind: 'transition', id: t.id })
+    else {
+      store.select({ kind: 'transition', id: t.id })
+      if (tool === 'select') startBend(e, t)
+    }
   }
 
   const handleTransitionDoubleClick = (e: MouseEvent<SVGGElement>, t: TransitionEdge): void => {
@@ -554,14 +596,21 @@ export function Canvas({ readOnly = false }: CanvasProps) {
           { label: 'Löschen', danger: true, onSelect: () => store.deleteState(state.id) }
         ]
       }
-      case 'transition':
+      case 'transition': {
+        const transition = findTransition(doc.graph, menu.id)
+        const isLoop = transition?.from === transition?.to
         return [
           {
             label: 'Symbole bearbeiten',
             onSelect: () => store.setInlineEdit({ kind: 'transition', id: menu.id })
           },
+          {
+            label: isLoop ? 'Schleife zurücksetzen' : 'Gerade machen',
+            onSelect: () => store.resetTransitionShape(menu.id)
+          },
           { label: 'Löschen', danger: true, onSelect: () => store.deleteTransition(menu.id) }
         ]
+      }
       case 'group':
         return [{ label: 'Löschen', danger: true, onSelect: store.deleteSelection }]
       case 'background':

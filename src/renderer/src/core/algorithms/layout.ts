@@ -1,4 +1,4 @@
-import { stateName, type EditorGraph, type StateId } from '@/model/graph'
+import { stateName, withShape, type EditorGraph, type StateId } from '@/model/graph'
 
 const COLUMN_SPACING = 180
 const ROW_SPACING = 120
@@ -51,7 +51,9 @@ export function layoutByDepth(graph: EditorGraph): EditorGraph {
   }
   return {
     ...graph,
-    states: graph.states.map((s) => ({ ...s, ...position.get(s.id) }))
+    states: graph.states.map((s) => ({ ...s, ...position.get(s.id) })),
+    // Neue Anordnung: Biegungen und gedrehte Schleifen passen nicht mehr
+    transitions: graph.transitions.map((t) => withShape(t, {}))
   }
 }
 

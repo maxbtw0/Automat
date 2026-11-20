@@ -52,6 +52,9 @@ export function TransitionView({
     >
       <path className="transition-hit" d={geometry.path} />
       <path className="transition-line" d={geometry.path} markerEnd={`url(#${marker})`} />
+      {selected && (
+        <circle className="bend-handle" cx={geometry.mid.x} cy={geometry.mid.y} r={5} />
+      )}
       <text className={classNames('transition-label', isEmpty && 'is-empty')} textAnchor="middle">
         {labelLineYs(center.y, lines.length).map((y, i) => (
           <tspan key={i} x={center.x} y={y} dominantBaseline="central">

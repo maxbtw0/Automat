@@ -79,6 +79,30 @@ export interface TransitionEdge {
   to: StateId
   /** Regeln, mit denen dieser Übergang schaltet (ein Übergang pro Zustandspaar) */
   labels: TransitionLabel[]
+  /**
+   * Gebogen: Versatz des Kontrollpunkts senkrecht zur Sehne (Weltpixel, vorzeichenbehaftet,
+   * bezogen auf die Richtung from → to). Fehlt = automatisch (gerade, bei Gegenkante gebogen).
+   */
+  bend?: number
+  /** Schleife: Richtung in Bogenmaß (0 = oben, im Uhrzeigersinn). Fehlt = freie Seite. */
+  loopAngle?: number
+  /** Schleife: Weite als Faktor auf die Standardhöhe. Fehlt = 1. */
+  loopSize?: number
+}
+
+/** Die Form-Angaben eines Übergangs (alle optional) */
+export type TransitionShape = Pick<TransitionEdge, 'bend' | 'loopAngle' | 'loopSize'>
+
+/** Übergang mit genau dieser Form: nicht genannte Angaben entfallen, `{}` = automatisch. */
+export function withShape(transition: TransitionEdge, shape: TransitionShape): TransitionEdge {
+  const { bend, loopAngle, loopSize, ...rest } = transition
+  void bend, loopAngle, loopSize
+  return {
+    ...rest,
+    ...(shape.bend !== undefined && { bend: shape.bend }),
+    ...(shape.loopAngle !== undefined && { loopAngle: shape.loopAngle }),
+    ...(shape.loopSize !== undefined && { loopSize: shape.loopSize })
+  }
 }
 
 export interface EditorGraph {

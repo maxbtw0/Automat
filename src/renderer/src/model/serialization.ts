@@ -209,8 +209,27 @@ function pickState({ id, label, x, y, isStart, isFinal, output }: StateNode): St
   return { id, label, x, y, isStart, isFinal, ...moore }
 }
 
-function pickTransition({ id, from, to, labels }: TransitionEdge): TransitionEdge {
-  return { id, from, to, labels: labels.map(pickLabel) }
+/** Form-Angaben (Biegung, Schleife) sind optional – ungültige Werte werden verworfen. */
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+
+function pickTransition({
+  id,
+  from,
+  to,
+  labels,
+  bend,
+  loopAngle,
+  loopSize
+}: TransitionEdge): TransitionEdge {
+  return {
+    id,
+    from,
+    to,
+    labels: labels.map(pickLabel),
+    ...(finite(bend) && { bend }),
+    ...(finite(loopAngle) && { loopAngle }),
+    ...(finite(loopSize) && loopSize > 0 && { loopSize })
+  }
 }
 
 function pickDocument(doc: AutomatonDocument, transitions: TransitionEdge[]): AutomatonDocument {

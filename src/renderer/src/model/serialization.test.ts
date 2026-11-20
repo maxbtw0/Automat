@@ -3,6 +3,30 @@ import { createEmptyDocument } from './graph'
 import { deserializeDocument, serializeDocument } from './serialization'
 
 describe('serialization', () => {
+  it('speichert Biegung und Schleifenform und liest sie wieder ein', () => {
+    const doc = createEmptyDocument()
+    doc.alphabet = ['a']
+    doc.graph.states.push(
+      { id: 's1', label: 'q0', x: 0, y: 0, isStart: true, isFinal: false },
+      { id: 's2', label: 'q1', x: 100, y: 0, isStart: false, isFinal: true }
+    )
+    doc.graph.transitions.push(
+      { id: 't1', from: 's1', to: 's2', labels: [{ read: 'a' }], bend: -42.5 },
+      { id: 't2', from: 's1', to: 's1', labels: [{ read: 'a' }], loopAngle: 1.5, loopSize: 1.8 }
+    )
+    expect(deserializeDocument(serializeDocument(doc))).toEqual(doc)
+  })
+
+  it('verwirft ungültige Formangaben, ältere Dateien ohne bleiben ladbar', () => {
+    const doc = createEmptyDocument()
+    doc.graph.states.push({ id: 's1', label: 'q0', x: 0, y: 0, isStart: true, isFinal: false })
+    doc.graph.transitions.push({ id: 't1', from: 's1', to: 's1', labels: [{ read: 'a' }] })
+    const data = JSON.parse(serializeDocument(doc))
+    Object.assign(data.document.graph.transitions[0], { bend: 'x', loopAngle: null, loopSize: -1 })
+    const loaded = deserializeDocument(JSON.stringify(data))
+    expect(loaded.graph.transitions[0]).toEqual(doc.graph.transitions[0])
+  })
+
   it('liest ein gespeichertes Dokument unverändert wieder ein', () => {
     const doc = createEmptyDocument()
     doc.alphabet = ['a', 'b']

@@ -700,6 +700,7 @@ function TooltipsPage() {
             ['Doppelklick auf freie Fläche', 'neuer Zustand'],
             ['Doppelklick auf Zustand', 'umbenennen'],
             ['Doppelklick auf Übergang', 'Beschriftung bearbeiten'],
+            ['Übergang ziehen', 'zum Bogen biegen; bei einer Schleife drehen und weiten'],
             ['Lasso: frei umfahren', 'mehrere Zustände samt Übergängen auswählen'],
             [<kbd key="u">Umschalt</kbd>, '+ Klick, Rechteck oder Lasso: zur Auswahl hinzufügen'],
             ['Ausgewählte Gruppe ziehen', 'alle zusammen verschieben'],
