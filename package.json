@@ -1,6 +1,6 @@
 {
   "name": "automat",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Editor und Simulator für Automaten (DEA, NEA, Kellerautomat, Turingmaschine)",
   "author": "maxbtw0",

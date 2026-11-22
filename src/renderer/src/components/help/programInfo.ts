@@ -17,6 +17,20 @@ export interface ChangelogEntry {
 /** Neueste Version zuerst. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.1',
+    changes: [
+      'Alles auswählen mit Strg+A, in Alphabet und Übergangstabelle nur die aktive Tabelle',
+      'Entf löscht markierte Zeilen im Alphabet und in der Übergangstabelle',
+      'Übergänge und Schleifen lassen sich biegen, „Gerade machen“ setzt zurück',
+      'Einrasten am Raster: Magnet-Knopf und Taste G',
+      'NEA-Simulation: echter Lauf durch die Originalzustände mit Rücksprung',
+      'Moore: Zustandsnamen mit Schrägstrich im Inline-Editor',
+      'AutoEdit-Import: keine Endlosschleife bei riesigen Koordinaten',
+      'Export: Bandausschnitt pro Bild höchstens 31 Zellen',
+      'Portable .exe zusätzlich zum Installer'
+    ]
+  },
+  {
     version: '1.1.0',
     changes: [
       'Transduktoren: Mealy- und Moore-Automat mit Ausgabealphabet Δ, Umwandlung Mealy ↔ Moore',
